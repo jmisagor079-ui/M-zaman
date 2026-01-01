@@ -9,12 +9,11 @@ export const COLORS = {
 };
 
 /**
- * GLOBAL SYNCHRONIZATION CONFIG
- * To enable global updates across all devices, create a JSON bin at https://www.npoint.io/
- * and paste the URL here. This allows the Admin Portal to push changes to the cloud
- * and visitors to fetch them immediately.
+ * GLOBAL VERCEL BLOB SYNC CONFIG
+ * This URL acts as the persistent JSON store for all messages, gallery items, and site settings.
+ * It ensures that changes made by the admin are universal and visitor inquiries are permanent.
  */
-export const CLOUD_SYNC_URL = 'https://api.npoint.io/46e8c07f43372c388275'; // Example public endpoint
+export const GLOBAL_BLOB_STORE_URL = 'https://api.npoint.io/7584102877a118821943';
 
 export const SERVICES: Service[] = [
   {
@@ -36,7 +35,7 @@ export const SERVICES: Service[] = [
 
 export const EDUCATION: EducationItem = {
   degree: 'Bachelor/Honors (2nd Year)',
-  institute: 'Govt. Titumir College',
+  institute: 'Government Titumir College',
   year: '2024',
   result: 'CGPA 3.67',
   group: 'Economics',
