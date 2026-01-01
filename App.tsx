@@ -27,7 +27,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'gallery'>('home');
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Persistence Fix: Using lazy state initialization
+  // Persistence logic
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = localStorage.getItem('maisha_messages');
     return saved ? JSON.parse(saved) : [];
@@ -93,7 +93,8 @@ const App: React.FC = () => {
 
     setIsAiLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fixed syntax to match guidelines
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words. Focus on texture, emotion, and craftsmanship.`,
@@ -103,7 +104,6 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      alert("Could not connect to Visionary AI. Check API Key configuration.");
     } finally {
       setIsAiLoading(false);
     }
@@ -167,6 +167,13 @@ const App: React.FC = () => {
     setTimeout(() => setStatusMsg(null), 3000);
   };
 
+  // User requested ability for admin to delete any art
+  const deleteArt = (id: string) => {
+    setArtGallery(prev => prev.filter(a => a.id !== id));
+    setStatusMsg({ text: 'Art Removed', type: 'success' });
+    setTimeout(() => setStatusMsg(null), 3000);
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (username === 'M. ZAMAN' && password === 'M121213') {
@@ -203,7 +210,6 @@ const App: React.FC = () => {
     e.currentTarget.reset();
   };
 
-  // Defining identity items with improved layout syntax to prevent clipping
   const identityItems: IdentityItem[] = [
     { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
     { label: 'Institution', value: EDUCATION.institute, icon: <GraduationCap size={20} className="text-indigo-500" /> },
@@ -320,7 +326,7 @@ const App: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3 text-orange-600">
                          <Palette size={24} />
-                         <h3 className="text-xl font-bold">Upload New Art</h3>
+                         <h3 className="text-xl font-bold">Gallery Management</h3>
                       </div>
                       <button 
                         onClick={generateAiDescription}
@@ -351,6 +357,24 @@ const App: React.FC = () => {
                         <Plus size={18} /> UPLOAD TO GALLERY
                       </button>
                     </form>
+
+                    {/* New Section: Delete Art from Gallery */}
+                    <div className="pt-6 border-t border-slate-100">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Manage Current Artworks</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {artGallery.map((art) => (
+                          <div key={art.id} className="relative aspect-square rounded-lg overflow-hidden group border border-slate-100 shadow-sm">
+                            <img src={art.url} alt={art.title} className="w-full h-full object-cover" />
+                            <button 
+                              onClick={() => deleteArt(art.id)}
+                              className="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </GlassCard>
                 </div>
               </motion.div>
@@ -440,12 +464,12 @@ const App: React.FC = () => {
         <section className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[60vh] lg:min-h-[80vh]">
           <div className="lg:hidden w-full text-center space-y-3">
              <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
-             <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-100 rounded-full text-purple-600 text-[10px] font-bold uppercase tracking-widest"><GraduationCap size={12} /> Govt. Titumir College</div>
+             <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-100 rounded-full text-purple-600 text-[10px] font-bold uppercase tracking-widest"><GraduationCap size={12} /> {EDUCATION.institute}</div>
           </div>
 
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} className="hidden lg:block space-y-8">
             <h1 className="text-8xl font-serif font-bold leading-[1.1] tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold uppercase tracking-widest"><GraduationCap size={14} /> Economics Student | Govt. Titumir College</div>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold uppercase tracking-widest"><GraduationCap size={14} /> Economics Student | {EDUCATION.institute}</div>
             <p className="text-2xl text-slate-500 max-w-lg leading-relaxed font-light">Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.</p>
             <div className="flex gap-5">
               <button onClick={() => setShowHireModal(true)} className="bg-slate-900 text-white px-10 py-5 rounded-2xl font-bold shadow-2xl hover:bg-slate-800 transition-all transform hover:-translate-y-1">Hire Me</button>
@@ -453,6 +477,7 @@ const App: React.FC = () => {
             </div>
           </motion.div>
 
+          {/* Hero Image */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }} 
             animate={{ opacity: 1, scale: 1 }} 
@@ -492,7 +517,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Professional Identity */}
+        {/* Identity Section */}
         <section id="about" className="relative">
           <div className="mb-20 text-center lg:text-left">
             <h2 className="text-5xl md:text-7xl font-serif font-bold mb-4 tracking-tighter text-slate-900">Professional <span className="text-purple-600 italic">Identity</span></h2>
@@ -615,7 +640,7 @@ const App: React.FC = () => {
               <div className="p-12 lg:p-20 bg-slate-900 text-white relative">
                  <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
                  <h2 className="text-5xl font-serif font-bold mb-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-peach-300 relative z-10">Let's Connect</h2>
-                 <div className="space-y-10 relative z-10">{SOCIALS.map((link) => (<a key={link.platform} href={link.url} target="_blank" className="flex items-center space-x-6 group"><div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 group-hover:border-transparent transition-all shadow-xl">{link.icon === 'Facebook' && <Facebook size={28} />}{link.icon === 'Mail' && <Mail size={28} />}{link.icon === 'Phone' && <Phone size={28} />}</div><span className="text-xl font-bold group-hover:text-purple-400 transition-colors">{link.platform}</span></a>))}</div>
+                 <div className="space-y-10 relative z-10">{SOCIALS.map((link) => (<a key={link.platform} href={link.url} target="_blank" className="flex items-center space-x-6 group"><div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 group-hover:border-transparent transition-all shadow-xl">{link.platform === 'Facebook' ? <Facebook size={28} /> : link.platform === 'Email' ? <Mail size={28} /> : <Phone size={28} />}</div><span className="text-xl font-bold group-hover:text-purple-400 transition-colors">{link.platform}</span></a>))}</div>
               </div>
               <div className="p-12 lg:p-20 bg-white/40 backdrop-blur-3xl"><form className="space-y-10" onSubmit={handleContactSubmit}><div className="grid grid-cols-1 sm:grid-cols-2 gap-10"><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Name</label><input name="name" required type="text" className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 text-slate-900 font-bold transition-colors" placeholder="e.g. Abdullah" /></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Phone</label><input name="phone" required type="tel" className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 text-slate-900 font-bold transition-colors" placeholder="017xxxxxxxx" /></div></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Message</label><textarea name="inquiry" required className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 h-32 resize-none text-slate-900 font-bold transition-colors" placeholder="Write something..." /></div><button type="submit" className="w-full bg-purple-600 text-white py-6 rounded-2xl font-bold tracking-[0.2em] shadow-2xl hover:bg-purple-700 active:scale-[0.98] transition-all">SEND INQUIRY</button></form></div>
             </div>
@@ -652,7 +677,11 @@ const App: React.FC = () => {
         </div>
       )}</AnimatePresence>
 
-      <footer className="py-20 border-t border-slate-200 bg-white/30 backdrop-blur-sm">
+      <footer className="py-20 border-t border-slate-200 bg-white/30 backdrop-blur-sm relative">
+        <div className="absolute bottom-4 left-4 text-[8px] text-slate-300 font-medium opacity-40 text-left pointer-events-none">
+          Made By Jamil<br />
+          01307541441
+        </div>
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="text-3xl font-serif font-bold text-slate-900 mb-6 uppercase tracking-[0.4em]">M. Zaman</div>
           <p className="text-slate-400 text-sm font-medium">&copy; 2024 Maisha Zaman. Economics Scholar & Visionary Artist.</p>

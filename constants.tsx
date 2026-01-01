@@ -1,4 +1,3 @@
-
 import { BookOpen, Palette, GraduationCap, User, MapPin, Mail, Phone, Facebook } from 'lucide-react';
 import { Service, EducationItem, SocialLink } from './types';
 
@@ -28,8 +27,8 @@ export const SERVICES: Service[] = [
 ];
 
 export const EDUCATION: EducationItem = {
-  degree: '2nd Year (Bachelor)',
-  institute: 'Govt. Titumir College',
+  degree: 'Bachelor/Honors (2nd Year)',
+  institute: 'Government Titumir College',
   year: '2024',
   result: 'CGPA 3.67',
   group: 'Economics',
