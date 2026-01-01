@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -27,8 +28,7 @@ const App: React.FC = () => {
   
   const [heroImages, setHeroImages] = useState<string[]>(() => {
     const saved = localStorage.getItem('maisha_hero_imgs');
-    // Using a more professional academic/creative placeholder
-    return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800"];
+    return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"];
   });
   
   const [artGallery, setArtGallery] = useState<ArtWork[]>(() => {
@@ -88,7 +88,6 @@ const App: React.FC = () => {
 
     setIsAiLoading(true);
     try {
-      // Fix: Creating new GoogleGenAI instance right before the API call to ensure use of injected API_KEY
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -99,8 +98,7 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      // Fix: Generic error message to comply with security guidelines (never ask user for API key)
-      alert("AI Service is temporarily unavailable. Please try again later.");
+      alert("Could not connect to Visionary AI. Check API Key configuration.");
     } finally {
       setIsAiLoading(false);
     }
