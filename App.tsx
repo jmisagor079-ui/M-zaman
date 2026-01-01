@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, Palette, GraduationCap, MapPin, Phone, Mail, 
   Facebook, User, Calendar, Briefcase, Clock, DollarSign, 
-  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
+  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2, BadgeCheck
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from '@supabase/supabase-js';
@@ -13,7 +12,7 @@ import GlassCard from './components/GlassCard';
 import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
 import { Message, ArtWork, Comment } from './types';
 
-// Supabase Configuration
+// Supabase Configuration - Integrated with provided project details
 const SUPABASE_URL = 'https://pgqvbmudkjhsmdhkzqzu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncXZibXVka2poc21kaGt6cXp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczOTUsImV4cCI6MjA4Mjg2MzM5NX0.EegAsIdTfNeAb0diepBuL1ha2aeEEipFwPTeLPWiQa4';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -33,6 +32,7 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery'>('home');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Cloud Persistence logic via Supabase
   const [messages, setMessages] = useState<Message[]>([]);
@@ -55,6 +55,7 @@ const App: React.FC = () => {
   }, []);
 
   const fetchInitialData = async () => {
+    setIsInitialLoading(true);
     try {
       // Fetch Messages
       const { data: msgs, error: msgsError } = await supabase
@@ -79,6 +80,8 @@ const App: React.FC = () => {
       if (!artsError && arts) setArtGallery(arts);
     } catch (err) {
       console.error("Supabase fetch error:", err);
+    } finally {
+      setIsInitialLoading(false);
     }
   };
 
@@ -106,7 +109,8 @@ const App: React.FC = () => {
 
     setIsAiLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Strictly using process.env.API_KEY as per instructions
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words. Focus on texture, emotion, and craftsmanship.`,
@@ -123,7 +127,10 @@ const App: React.FC = () => {
 
   const saveMessage = async (msg: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage = {
-      ...msg,
+      name: msg.name,
+      phone: msg.phone,
+      content: msg.content,
+      type: msg.type,
       timestamp: new Date().toLocaleString(),
     };
     
@@ -442,39 +449,46 @@ const App: React.FC = () => {
           </div>
         </nav>
         <main className="max-w-7xl mx-auto px-6 pt-32 pb-32">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {artGallery.map((art) => (
-              <motion.div key={art.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} className="flex flex-col gap-6">
-                <div className="glass rounded-[40px] overflow-hidden shadow-2xl group">
-                   <div className="aspect-[4/3] overflow-hidden">
-                      <img src={art.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={art.title} />
-                   </div>
-                   <div className="p-8">
-                      <h3 className="text-2xl font-serif font-bold mb-2">{art.title}</h3>
-                      <p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{art.description}"</p>
-                      <div className="pt-4 border-t border-slate-100">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
-                            <MessageCircle size={14} /> {art.comments?.length || 0} Comments
-                         </div>
-                         <form className="flex gap-2" onSubmit={async (e) => {
-                           e.preventDefault();
-                           const f = e.currentTarget;
-                           const text = (f.elements.namedItem('cmt') as HTMLInputElement).value;
-                           if(text) {
-                             const updatedComments = [...(art.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}];
-                             updateArtComments(art.id, updatedComments);
-                             f.reset();
-                           }
-                         }}>
-                            <input name="cmt" placeholder="Share your thoughts..." className="flex-1 glass bg-white/50 border-none px-4 py-2 rounded-xl outline-none text-xs focus:ring-1 ring-purple-400" />
-                            <button type="submit" className="p-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"><Send size={16} /></button>
-                         </form>
-                      </div>
-                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          {isInitialLoading ? (
+            <div className="flex flex-col items-center justify-center py-40 gap-4">
+              <Loader2 size={48} className="text-purple-600 animate-spin" />
+              <p className="text-slate-400 font-bold tracking-widest">CURATING GALLERY...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {artGallery.map((art) => (
+                <motion.div key={art.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} className="flex flex-col gap-6">
+                  <div className="glass rounded-[40px] overflow-hidden shadow-2xl group">
+                    <div className="aspect-[4/3] overflow-hidden">
+                        <img src={art.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={art.title} />
+                    </div>
+                    <div className="p-8">
+                        <h3 className="text-2xl font-serif font-bold mb-2">{art.title}</h3>
+                        <p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{art.description}"</p>
+                        <div className="pt-4 border-t border-slate-100">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
+                              <MessageCircle size={14} /> {art.comments?.length || 0} Comments
+                          </div>
+                          <form className="flex gap-2" onSubmit={async (e) => {
+                            e.preventDefault();
+                            const f = e.currentTarget;
+                            const text = (f.elements.namedItem('cmt') as HTMLInputElement).value;
+                            if(text) {
+                              const updatedComments = [...(art.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}];
+                              updateArtComments(art.id, updatedComments);
+                              f.reset();
+                            }
+                          }}>
+                              <input name="cmt" placeholder="Share your thoughts..." className="flex-1 glass bg-white/50 border-none px-4 py-2 rounded-xl outline-none text-xs focus:ring-1 ring-purple-400" />
+                              <button type="submit" className="p-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"><Send size={16} /></button>
+                          </form>
+                        </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </main>
       </div>
     );
@@ -500,19 +514,30 @@ const App: React.FC = () => {
             <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl shadow-inner">M</div>
             <span>M. ZAMAN</span>
           </motion.div>
-          <button onClick={() => setShowLoginModal(true)} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-purple-600 transition-all">ADMIN LOGIN</button>
+          <div className="flex items-center gap-8">
+            <button onClick={() => setView('gallery')} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 hover:text-purple-600 transition-all hidden md:block">Gallery</button>
+            <button onClick={() => setShowLoginModal(true)} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-purple-600 transition-all">ADMIN LOGIN</button>
+          </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 pt-32 space-y-40 pb-32">
         <section className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[60vh] lg:min-h-[80vh]">
           <div className="lg:hidden w-full text-center space-y-3">
-             <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+             <div className="flex items-center justify-center gap-2 mb-2">
+                <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+                <BadgeCheck className="text-purple-500" size={24} />
+             </div>
              <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-100 rounded-full text-purple-600 text-[10px] font-bold uppercase tracking-widest"><GraduationCap size={12} /> {EDUCATION.institute}</div>
           </div>
 
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} className="hidden lg:block space-y-8">
-            <h1 className="text-8xl font-serif font-bold leading-[1.1] tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-8xl font-serif font-bold leading-[1.1] tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1, type: 'spring' }}>
+                <BadgeCheck className="text-purple-500" size={48} />
+              </motion.div>
+            </div>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold uppercase tracking-widest"><GraduationCap size={14} /> Economics Student | {EDUCATION.institute}</div>
             <p className="text-2xl text-slate-500 max-w-lg leading-relaxed font-light">Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.</p>
             <div className="flex gap-5">
@@ -531,9 +556,15 @@ const App: React.FC = () => {
             <div className="absolute -inset-5 lg:-inset-10 bg-gradient-to-tr from-purple-300/30 blur-2xl lg:blur-3xl rounded-full animate-pulse" />
             <div className="relative glass p-2 lg:p-5 rounded-[24px] lg:rounded-[48px] shadow-2xl overflow-hidden group border border-white/50">
               <div className="overflow-hidden rounded-[20px] lg:rounded-[40px] bg-slate-100 aspect-[4/5] relative">
-                <AnimatePresence mode="wait">
-                  <motion.img key={currentHeroIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 1 }} src={heroImages[currentHeroIndex]} alt="Maisha Zaman" className="absolute inset-0 w-full h-full object-cover" />
-                </AnimatePresence>
+                {isInitialLoading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
+                    <Loader2 size={32} className="text-purple-300 animate-spin" />
+                  </div>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    <motion.img key={currentHeroIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 1 }} src={heroImages[currentHeroIndex]} alt="Maisha Zaman" className="absolute inset-0 w-full h-full object-cover" />
+                  </AnimatePresence>
+                )}
                 {heroImages.length > 1 && (
                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                     {heroImages.map((_, i) => (
@@ -545,7 +576,7 @@ const App: React.FC = () => {
               <div className="absolute bottom-4 lg:bottom-10 -left-2 lg:-left-6 glass p-2 lg:p-6 rounded-xl lg:rounded-3xl shadow-2xl border border-white/60" style={{ transform: "translateZ(50px)" }}>
                 <div className="flex items-center space-x-2 lg:space-x-4">
                   <div className="bg-green-500 w-2 h-2 lg:w-4 lg:h-4 rounded-full animate-pulse shadow-md" />
-                  <div className="text-left font-bold text-[8px] lg:text-sm text-slate-800 uppercase tracking-widest">Visionary</div>
+                  <div className="text-left font-bold text-[8px] lg:text-sm text-slate-800 uppercase tracking-widest">Visionary & Trusted</div>
                 </div>
               </div>
             </div>
@@ -580,14 +611,14 @@ const App: React.FC = () => {
                          <div className="flex flex-col items-center gap-2">
                             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Award size={18} className="text-purple-300" /></div>
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Performance</span>
-                              <span className="text-sm font-bold">CGPA {EDUCATION.result}</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Academic Standing</span>
+                              <span className="text-sm font-bold">{EDUCATION.result} | Honors</span>
                             </div>
                          </div>
                          <div className="flex flex-col items-center gap-2">
                             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Zap size={18} className="text-orange-300" /></div>
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Curriculum</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Medium</span>
                               <span className="text-sm font-bold">{EDUCATION.curriculum}</span>
                             </div>
                          </div>
@@ -624,16 +655,16 @@ const App: React.FC = () => {
             <div className="lg:col-span-4 flex flex-col gap-8">
                <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="glass p-10 rounded-[48px] border border-white/60 shadow-xl bg-gradient-to-br from-white to-purple-50/30 flex-1">
                   <div className="flex items-center justify-between mb-10">
-                    <h4 className="text-2xl font-serif font-bold text-slate-800">Capabilities</h4>
+                    <h4 className="text-2xl font-serif font-bold text-slate-800">Trust Matrix</h4>
                     <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 shadow-sm">
-                      <Zap size={20} />
+                      <ShieldCheck size={20} />
                     </div>
                   </div>
                   <div className="space-y-8">
                     {[
-                      { skill: 'Teaching Method', level: '98%', color: 'from-purple-500 to-indigo-500' },
-                      { skill: 'Conceptual Depth', level: '92%', color: 'from-indigo-500 to-blue-500' },
-                      { skill: 'Creative Insight', level: '95%', color: 'from-pink-500 to-orange-500' },
+                      { skill: 'Verified Identity', level: '100%', color: 'from-green-500 to-teal-500' },
+                      { skill: 'Parental Trust', level: '96%', color: 'from-purple-500 to-indigo-500' },
+                      { skill: 'Subject Mastery', level: '94%', color: 'from-pink-500 to-orange-500' },
                     ].map(s => (
                       <div key={s.skill}>
                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
@@ -653,15 +684,16 @@ const App: React.FC = () => {
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                      <span className="text-2xl font-bold">Hire Maisha</span>
+                      <span className="text-2xl font-bold">Secure Booking</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 font-bold tracking-widest uppercase">Student Home & Private Tuition</p>
+                    <p className="text-[11px] text-slate-400 font-bold tracking-widest uppercase">Verified Tutor ID: {PERSONAL_INFO.tutorId}</p>
                   </div>
                </motion.div>
             </div>
           </div>
         </section>
 
+        {/* Teaching Services */}
         <section id="tuition">
           <div className="text-center mb-20"><h2 className="text-4xl md:text-5xl font-serif font-bold mb-4 text-slate-900">Teaching Services</h2><p className="text-slate-500 font-medium">Expert guidance tailored for English Version students.</p></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
@@ -674,6 +706,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
+        {/* Contact Form */}
         <section id="contact">
           <GlassCard className="!p-0 overflow-hidden border-purple-100 shadow-3xl">
             <div className="grid grid-cols-1 lg:grid-cols-2">
@@ -688,6 +721,7 @@ const App: React.FC = () => {
         </section>
       </main>
 
+      {/* Modals */}
       <AnimatePresence>{showHireModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowHireModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
