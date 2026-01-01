@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, Palette, GraduationCap, MapPin, Phone, Mail, 
   Facebook, User, Calendar, Briefcase, Clock, DollarSign, 
-  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Verified, Plus, ArrowLeft, Send, Image as ImageIcon, Upload
+  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Verified, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
 } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 import ThreeBackground from './components/ThreeBackground';
 import GlassCard from './components/GlassCard';
 import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
@@ -17,46 +17,58 @@ const App: React.FC = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery'>('home');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  
-  // Hero Section Multi-Image State
-  const [heroImages, setHeroImages] = useState<string[]>(["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"]);
-  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const [artGallery, setArtGallery] = useState<ArtWork[]>([
-    { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
-    { id: '2', url: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?q=80&w=600', title: 'Golden Strokes', description: 'Acrylic fabric painting experiment.', comments: [] },
-    { id: '3', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=600', title: 'Abstract Crimson', description: 'Cotton dupatta design.', comments: [] },
-    { id: '4', url: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?q=80&w=600', title: 'Nature Breeze', description: 'Floral patterns on linen.', comments: [] },
-    { id: '5', url: 'https://images.unsplash.com/photo-1525909002-1b05e0c869d8?q=80&w=600', title: 'Night Bloom', description: 'Glow-in-the-dark fabric art.', comments: [] },
-  ]);
+  // Persistence Fix: Using lazy state initialization
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('maisha_messages');
+    return saved ? JSON.parse(saved) : [];
+  });
   
-  // Login form states
+  const [heroImages, setHeroImages] = useState<string[]>(() => {
+    const saved = localStorage.getItem('maisha_hero_imgs');
+    // Using a more professional academic/creative placeholder
+    return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800"];
+  });
+  
+  const [artGallery, setArtGallery] = useState<ArtWork[]>(() => {
+    const saved = localStorage.getItem('maisha_art');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
+      { id: '2', url: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?q=80&w=600', title: 'Golden Strokes', description: 'Acrylic fabric painting experiment.', comments: [] },
+      { id: '3', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=600', title: 'Abstract Crimson', description: 'Cotton dupatta design.', comments: [] }
+    ];
+  });
+
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [adminTab, setAdminTab] = useState<'messages' | 'settings'>('messages');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const artDescRef = useRef<HTMLTextAreaElement>(null);
+  const artTitleRef = useRef<HTMLInputElement>(null);
+
+  // Sync state to local storage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('maisha_messages', JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem('maisha_hero_imgs', JSON.stringify(heroImages));
+  }, [heroImages]);
+
+  useEffect(() => {
+    localStorage.setItem('maisha_art', JSON.stringify(artGallery));
+  }, [artGallery]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
-    
-    // Load persisted data
-    const savedMessages = localStorage.getItem('maisha_messages');
-    if (savedMessages) setMessages(JSON.parse(savedMessages));
-    
-    const savedArt = localStorage.getItem('maisha_art');
-    if (savedArt) setArtGallery(JSON.parse(savedArt));
-    
-    const savedImg = localStorage.getItem('maisha_hero_imgs');
-    if (savedImg) setHeroImages(JSON.parse(savedImg));
-
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Hero Slider logic
   useEffect(() => {
     if (heroImages.length > 1) {
       const interval = setInterval(() => {
@@ -66,23 +78,47 @@ const App: React.FC = () => {
     }
   }, [heroImages]);
 
+  // AI Feature: Generate Art Description using Gemini
+  const generateAiDescription = async () => {
+    const title = artTitleRef.current?.value;
+    if (!title) {
+      alert("Please enter a title first.");
+      return;
+    }
+
+    setIsAiLoading(true);
+    try {
+      // Fix: Creating new GoogleGenAI instance right before the API call to ensure use of injected API_KEY
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words. Focus on texture, emotion, and craftsmanship.`,
+      });
+      if (artDescRef.current) {
+        artDescRef.current.value = response.text || "";
+      }
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      // Fix: Generic error message to comply with security guidelines (never ask user for API key)
+      alert("AI Service is temporarily unavailable. Please try again later.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const saveMessage = (msg: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = {
       ...msg,
       id: Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toLocaleString(),
     };
-    const updated = [newMessage, ...messages];
-    setMessages(updated);
-    localStorage.setItem('maisha_messages', JSON.stringify(updated));
+    setMessages(prev => [newMessage, ...prev]);
     setStatusMsg({ text: 'Message delivered', type: 'success' });
     setTimeout(() => setStatusMsg(null), 4000);
   };
 
   const deleteMessage = (id: string) => {
-    const updated = messages.filter(m => m.id !== id);
-    setMessages(updated);
-    localStorage.setItem('maisha_messages', JSON.stringify(updated));
+    setMessages(prev => prev.filter(m => m.id !== id));
   };
 
   const addHeroImage = (url: string) => {
@@ -90,9 +126,7 @@ const App: React.FC = () => {
       alert("Maximum 3 hero images allowed.");
       return;
     }
-    const updated = [...heroImages, url];
-    setHeroImages(updated);
-    localStorage.setItem('maisha_hero_imgs', JSON.stringify(updated));
+    setHeroImages(prev => [...prev, url]);
     setStatusMsg({ text: 'Hero Image Added', type: 'success' });
     setTimeout(() => setStatusMsg(null), 3000);
   };
@@ -102,10 +136,8 @@ const App: React.FC = () => {
       alert("At least one hero image is required.");
       return;
     }
-    const updated = heroImages.filter((_, i) => i !== index);
-    setHeroImages(updated);
+    setHeroImages(prev => prev.filter((_, i) => i !== index));
     setCurrentHeroIndex(0);
-    localStorage.setItem('maisha_hero_imgs', JSON.stringify(updated));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,25 +159,9 @@ const App: React.FC = () => {
       description: desc,
       comments: []
     };
-    const updated = [newArt, ...artGallery];
-    setArtGallery(updated);
-    localStorage.setItem('maisha_art', JSON.stringify(updated));
+    setArtGallery(prev => [newArt, ...prev]);
     setStatusMsg({ text: 'New Art Uploaded', type: 'success' });
     setTimeout(() => setStatusMsg(null), 3000);
-  };
-
-  const addComment = (artId: string, userName: string, text: string) => {
-    const updated = artGallery.map(art => {
-      if (art.id === artId) {
-        return {
-          ...art,
-          comments: [...art.comments, { user: userName || 'Anonymous', text, date: new Date().toLocaleDateString() }]
-        };
-      }
-      return art;
-    });
-    setArtGallery(updated);
-    localStorage.setItem('maisha_art', JSON.stringify(updated));
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -216,8 +232,8 @@ const App: React.FC = () => {
             {adminTab === 'messages' ? (
               <motion.div key="msgs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <div className="mb-12">
-                  <h1 className="text-5xl font-serif font-bold mb-2">Message Inbox</h1>
-                  <p className="text-slate-500">Managing {messages.length} inquiries.</p>
+                  <h1 className="text-5xl font-serif font-bold mb-2 text-slate-900">Message Inbox</h1>
+                  <p className="text-slate-500 font-medium">Managing {messages.length} student inquiries.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-6">
                   {messages.length === 0 ? (
@@ -248,7 +264,6 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                  {/* Homepage Image Management */}
                   <GlassCard className="space-y-6">
                     <div className="flex items-center justify-between">
                        <div className="flex items-center gap-3 text-purple-600">
@@ -257,11 +272,9 @@ const App: React.FC = () => {
                        </div>
                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{heroImages.length}/3 Images</span>
                     </div>
-
-                    {/* Image List */}
                     <div className="grid grid-cols-3 gap-4">
                       {heroImages.map((img, i) => (
-                        <div key={i} className="relative aspect-[4/5] rounded-xl overflow-hidden group">
+                        <div key={i} className="relative aspect-[4/5] rounded-xl overflow-hidden group border border-slate-100 shadow-inner">
                            <img src={img} className="w-full h-full object-cover" />
                            <button 
                              onClick={() => removeHeroImage(i)}
@@ -272,7 +285,6 @@ const App: React.FC = () => {
                         </div>
                       ))}
                     </div>
-
                     <form className="space-y-4" onSubmit={(e) => {
                       e.preventDefault();
                       const url = (e.currentTarget.elements.namedItem('imgurl') as HTMLInputElement).value;
@@ -281,43 +293,38 @@ const App: React.FC = () => {
                         (e.currentTarget.elements.namedItem('imgurl') as HTMLInputElement).value = '';
                       }
                     }}>
-                      <div>
-                        <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Option 1: Paste URL</label>
-                        <input name="imgurl" type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" placeholder="Paste image link here..." />
-                      </div>
+                      <input name="imgurl" type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" placeholder="Paste image link here..." />
                       <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold tracking-widest hover:bg-purple-600 transition-all">ADD FROM URL</button>
                     </form>
-
                     <div className="space-y-4">
-                      <label className="block text-xs font-black uppercase text-slate-400 tracking-widest mb-2">Option 2: Upload from Device</label>
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileUpload} 
-                        accept="image/*" 
-                        className="hidden" 
-                      />
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full glass border-2 border-dashed border-purple-200 py-4 rounded-2xl font-bold tracking-widest text-purple-600 flex items-center justify-center gap-2 hover:bg-purple-50 transition-all"
-                      >
+                      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+                      <button onClick={() => fileInputRef.current?.click()} className="w-full glass border-2 border-dashed border-purple-200 py-4 rounded-2xl font-bold tracking-widest text-purple-600 flex items-center justify-center gap-2 hover:bg-purple-50 transition-all">
                         <Upload size={18} /> UPLOAD IMAGE
                       </button>
                     </div>
                   </GlassCard>
 
-                  {/* Add Art Work */}
                   <GlassCard className="space-y-6">
-                    <div className="flex items-center gap-3 text-orange-600 mb-2">
-                       <Palette size={24} />
-                       <h3 className="text-xl font-bold">Upload New Art</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3 text-orange-600">
+                         <Palette size={24} />
+                         <h3 className="text-xl font-bold">Upload New Art</h3>
+                      </div>
+                      <button 
+                        onClick={generateAiDescription}
+                        disabled={isAiLoading}
+                        className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50"
+                      >
+                        {isAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                        AI Visionary Describe
+                      </button>
                     </div>
                     <form className="space-y-4" onSubmit={(e) => {
                       e.preventDefault();
                       const f = e.currentTarget;
                       const url = (f.elements.namedItem('arturl') as HTMLInputElement).value;
                       const title = (f.elements.namedItem('arttitle') as HTMLInputElement).value;
-                      const desc = (f.elements.namedItem('artdesc') as HTMLInputElement).value;
+                      const desc = (f.elements.namedItem('artdesc') as HTMLTextAreaElement).value;
                       if(url && title) {
                         addArt(url, title, desc);
                         f.reset();
@@ -325,9 +332,9 @@ const App: React.FC = () => {
                     }}>
                       <div className="grid grid-cols-2 gap-4">
                         <input name="arturl" required placeholder="Image URL" className="glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" />
-                        <input name="arttitle" required placeholder="Art Title" className="glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" />
+                        <input ref={artTitleRef} name="arttitle" required placeholder="Art Title" className="glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" />
                       </div>
-                      <textarea name="artdesc" placeholder="Brief description..." className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none h-20" />
+                      <textarea ref={artDescRef} name="artdesc" placeholder="Art description..." className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none h-24 resize-none" />
                       <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold tracking-widest hover:bg-orange-500 transition-all flex items-center justify-center gap-2">
                         <Plus size={18} /> UPLOAD TO GALLERY
                       </button>
@@ -342,7 +349,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Gallery View
   if (view === 'gallery') {
     return (
       <div className="min-h-screen relative text-slate-800 selection:bg-purple-200">
@@ -355,7 +361,6 @@ const App: React.FC = () => {
             <div className="text-xl font-serif font-bold tracking-widest">CREATIVE GALLERY</div>
           </div>
         </nav>
-
         <main className="max-w-7xl mx-auto px-6 pt-32 pb-32">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {artGallery.map((art) => (
@@ -366,34 +371,22 @@ const App: React.FC = () => {
                    </div>
                    <div className="p-8">
                       <h3 className="text-2xl font-serif font-bold mb-2">{art.title}</h3>
-                      <p className="text-slate-500 text-sm mb-6">{art.description}</p>
-                      
-                      <div className="space-y-4">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">
-                            <MessageCircle size={14} /> {art.comments.length} Comments
-                         </div>
-                         <div className="max-h-40 overflow-y-auto space-y-3 mb-4 pr-2">
-                            {art.comments.length === 0 ? (
-                              <p className="text-[10px] italic text-slate-400">Be the first to comment...</p>
-                            ) : (
-                              art.comments.map((c, i) => (
-                                <div key={i} className="bg-white/40 p-3 rounded-xl border border-white/60">
-                                   <p className="text-[10px] font-bold text-purple-600 mb-1">{c.user} <span className="text-slate-400">• {c.date}</span></p>
-                                   <p className="text-xs text-slate-600 leading-relaxed">{c.text}</p>
-                                </div>
-                              ))
-                            )}
+                      <p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{art.description}"</p>
+                      <div className="pt-4 border-t border-slate-100">
+                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
+                            <MessageCircle size={14} /> {art.comments?.length || 0} Comments
                          </div>
                          <form className="flex gap-2" onSubmit={(e) => {
                            e.preventDefault();
                            const f = e.currentTarget;
                            const text = (f.elements.namedItem('cmt') as HTMLInputElement).value;
                            if(text) {
-                             addComment(art.id, 'Visitor', text);
+                             const updated = artGallery.map(a => a.id === art.id ? {...a, comments: [...(a.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}]} : a);
+                             setArtGallery(updated);
                              f.reset();
                            }
                          }}>
-                            <input name="cmt" placeholder="Say something..." className="flex-1 glass bg-white/50 border-none px-4 py-2 rounded-xl outline-none text-xs focus:ring-1 ring-purple-400" />
+                            <input name="cmt" placeholder="Share your thoughts..." className="flex-1 glass bg-white/50 border-none px-4 py-2 rounded-xl outline-none text-xs focus:ring-1 ring-purple-400" />
                             <button type="submit" className="p-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"><Send size={16} /></button>
                          </form>
                       </div>
@@ -423,94 +416,57 @@ const App: React.FC = () => {
 
       <nav className={`fixed top-0 w-full z-50 transition-all duration-700 ${isScrolled ? 'glass py-3 shadow-sm' : 'py-8'}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-            className="text-2xl font-serif font-bold tracking-tighter text-purple-600 flex items-center gap-2 cursor-pointer"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          >
-            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl">M</div>
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-serif font-bold tracking-tighter text-purple-600 flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl shadow-inner">M</div>
             <span>M. ZAMAN</span>
           </motion.div>
-          <div className="flex items-center space-x-6">
-            <button onClick={() => setShowLoginModal(true)} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-purple-600 transition-all">ADMIN LOGIN</button>
-          </div>
+          <button onClick={() => setShowLoginModal(true)} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-purple-600 transition-all">ADMIN LOGIN</button>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 pt-32 space-y-40 pb-32">
-        
-        {/* Hero Section - Multi-Image Display optimized for Mobile */}
         <section className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-16 items-center min-h-[60vh] lg:min-h-[80vh]">
-          
-          {/* Header Block for Mobile */}
           <div className="lg:hidden w-full text-center space-y-3">
-             <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">
-               Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span>
-             </h1>
-             <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-100 rounded-full text-purple-600 text-[10px] font-bold uppercase tracking-widest">
-                <GraduationCap size={12} /> Govt. Titumir College
-             </div>
+             <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+             <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 border border-purple-100 rounded-full text-purple-600 text-[10px] font-bold uppercase tracking-widest"><GraduationCap size={12} /> Govt. Titumir College</div>
           </div>
 
-          {/* Desktop Text Block */}
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} className="hidden lg:block space-y-8">
-            <h1 className="text-8xl font-serif font-bold leading-[1.1] tracking-tight">
-              Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span>
-            </h1>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold uppercase tracking-widest">
-              <GraduationCap size={14} /> Economics Student | Govt. Titumir College
-            </div>
-            <p className="text-2xl text-slate-500 max-w-lg leading-relaxed font-light">
-              Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.
-            </p>
+            <h1 className="text-8xl font-serif font-bold leading-[1.1] tracking-tight">Maisha <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic">Zaman</span></h1>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-50 border border-purple-100 text-purple-600 text-xs font-bold uppercase tracking-widest"><GraduationCap size={14} /> Economics Student | Govt. Titumir College</div>
+            <p className="text-2xl text-slate-500 max-w-lg leading-relaxed font-light">Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.</p>
             <div className="flex gap-5">
               <button onClick={() => setShowHireModal(true)} className="bg-slate-900 text-white px-10 py-5 rounded-2xl font-bold shadow-2xl hover:bg-slate-800 transition-all transform hover:-translate-y-1">Hire Me</button>
               <button onClick={() => setView('gallery')} className="glass px-10 py-5 rounded-2xl font-bold border border-slate-200 hover:bg-white/50 transition-all transform hover:-translate-y-1 flex items-center gap-2">Art <Brush size={18} /></button>
             </div>
           </motion.div>
 
-          {/* Image Section */}
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full max-w-[280px] sm:max-w-md lg:max-w-none mx-auto order-1 lg:order-2">
             <div className="absolute -inset-5 lg:-inset-10 bg-gradient-to-tr from-purple-300/30 blur-2xl lg:blur-3xl rounded-full animate-pulse" />
             <div className="relative glass p-2 lg:p-5 rounded-[24px] lg:rounded-[48px] shadow-2xl overflow-hidden group">
               <div className="overflow-hidden rounded-[20px] lg:rounded-[40px] bg-slate-100 aspect-[4/5] relative">
                 <AnimatePresence mode="wait">
-                  <motion.img 
-                    key={currentHeroIndex}
-                    initial={{ opacity: 0, scale: 1.1, rotateY: -10 }}
-                    animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, rotateY: 10 }}
-                    transition={{ duration: 1, ease: "circOut" }}
-                    src={heroImages[currentHeroIndex]} 
-                    alt="Maisha Zaman" 
-                    className="absolute inset-0 w-full h-full object-cover" 
-                  />
+                  <motion.img key={currentHeroIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 1 }} src={heroImages[currentHeroIndex]} alt="Maisha Zaman" className="absolute inset-0 w-full h-full object-cover" />
                 </AnimatePresence>
                 {heroImages.length > 1 && (
-                  <div className="absolute bottom-3 lg:bottom-6 left-1/2 -translate-x-1/2 flex gap-1 lg:gap-2 z-20">
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                     {heroImages.map((_, i) => (
-                      <div key={i} className={`h-1 lg:h-1.5 rounded-full transition-all duration-500 ${i === currentHeroIndex ? 'w-4 lg:w-8 bg-purple-600 shadow-[0_0_10px_rgba(124,58,237,0.5)]' : 'w-1 lg:w-2 bg-white/50'}`} />
+                      <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === currentHeroIndex ? 'w-8 bg-purple-600 shadow-md' : 'w-2 bg-white/50'}`} />
                     ))}
                   </div>
                 )}
               </div>
-              {/* Picture Label - Visionary */}
               <div className="absolute bottom-4 lg:bottom-10 -left-2 lg:-left-6 glass p-2 lg:p-6 rounded-xl lg:rounded-3xl shadow-2xl border border-white/60">
                 <div className="flex items-center space-x-2 lg:space-x-4">
-                  <div className="bg-green-500 w-2 h-2 lg:w-4 lg:h-4 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.6)] animate-pulse" />
-                  <div className="text-left">
-                    <p className="font-bold text-[8px] lg:text-sm text-slate-800 uppercase tracking-widest">Visionary</p>
-                  </div>
+                  <div className="bg-green-500 w-2 h-2 lg:w-4 lg:h-4 rounded-full animate-pulse shadow-md" />
+                  <div className="text-left font-bold text-[8px] lg:text-sm text-slate-800 uppercase tracking-widest">Visionary</div>
                 </div>
               </div>
             </div>
           </motion.div>
 
-          {/* Bio & Buttons for Mobile */}
           <div className="lg:hidden flex flex-col items-center text-center space-y-6 px-4 order-2">
-            <p className="text-sm sm:text-lg text-slate-500 leading-relaxed font-light">
-               Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.
-            </p>
+            <p className="text-sm sm:text-lg text-slate-500 leading-relaxed font-light">Passionate student of Economics with 1 year of tutoring experience. Empowering minds through logic and creativity.</p>
             <div className="flex gap-4">
                <button onClick={() => setShowHireModal(true)} className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-xs shadow-xl">Hire Me</button>
                <button onClick={() => setView('gallery')} className="glass border border-slate-200 px-8 py-4 rounded-xl font-bold text-xs flex items-center gap-2">Art <Brush size={14} /></button>
@@ -518,41 +474,35 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Professional Identity - Perfect Text Alignment */}
-        <section id="about">
-          <div className="mb-16">
-            <h2 className="text-4xl md:text-6xl font-serif font-bold mb-4 tracking-tighter">Professional <span className="text-purple-600 italic">Identity</span></h2>
-            <div className="w-32 h-1.5 bg-gradient-to-r from-purple-600 via-pink-400 to-peach-300 rounded-full" />
+        {/* Professional Identity - Updated for Perfect Alignment */}
+        <section id="about" className="relative">
+          <div className="mb-20 text-center lg:text-left">
+            <h2 className="text-5xl md:text-7xl font-serif font-bold mb-4 tracking-tighter text-slate-900">Professional <span className="text-purple-600 italic">Identity</span></h2>
+            <div className="w-32 h-1.5 bg-gradient-to-r from-purple-600 via-pink-400 to-peach-300 rounded-full mx-auto lg:mx-0" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            <GlassCard delay={0.1} className="lg:col-span-8 !p-0 overflow-hidden shadow-2xl border-white/40">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <GlassCard delay={0.1} className="lg:col-span-8 !p-0 overflow-hidden shadow-2xl border-white/40 border">
                <div className="grid grid-cols-1 md:grid-cols-5 h-full">
-                 <div className="md:col-span-2 bg-[#1a1c2c] p-12 text-white flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl -mr-16 -mt-16" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-[28px] flex items-center justify-center mb-10 shadow-2xl">
-                        <User size={40} className="text-white" />
-                      </div>
-                      <h3 className="text-4xl font-serif font-bold mb-3 tracking-tight">Maisha Zaman</h3>
-                      <p className="text-purple-300 text-xs font-black uppercase tracking-[0.3em] mb-10 opacity-90">Economics Scholar</p>
+                 <div className="md:col-span-2 bg-[#1a1c2c] p-12 text-white flex flex-col justify-center items-center text-center relative overflow-hidden border-r border-white/5">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent" />
+                    <div className="relative z-10 w-full flex flex-col items-center">
+                      <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-pink-500 rounded-[32px] flex items-center justify-center mb-8 shadow-2xl border border-white/20"><User size={48} className="text-white" /></div>
+                      <h3 className="text-4xl font-serif font-bold mb-2 tracking-tight">Maisha Zaman</h3>
+                      <p className="text-purple-300 text-xs font-black uppercase tracking-[0.3em] mb-12 opacity-90">Economics Scholar</p>
                       
-                      <div className="space-y-6">
-                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                              <Award size={18} className="text-purple-300" />
-                            </div>
+                      <div className="space-y-8 w-full">
+                         <div className="flex flex-col items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Award size={18} className="text-purple-300" /></div>
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Academic Performance</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Performance</span>
                               <span className="text-sm font-bold">CGPA {EDUCATION.result}</span>
                             </div>
                          </div>
-                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                              <Zap size={18} className="text-orange-300" />
-                            </div>
+                         <div className="flex flex-col items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Zap size={18} className="text-orange-300" /></div>
                             <div className="flex flex-col">
-                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Current Curriculum</span>
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-0.5">Curriculum</span>
                               <span className="text-sm font-bold">{EDUCATION.curriculum}</span>
                             </div>
                          </div>
@@ -560,32 +510,30 @@ const App: React.FC = () => {
                     </div>
                  </div>
 
-                 <div className="md:col-span-3 p-12 bg-white/30 backdrop-blur-xl">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-12">
+                 <div className="md:col-span-3 p-12 bg-white/40 backdrop-blur-2xl flex flex-col justify-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-12 gap-x-10">
                        {[
-                         { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={18} className="text-purple-500" /> },
-                         { label: 'Institution', value: 'Govt. Titumir College', icon: <GraduationCap size={18} className="text-indigo-500" /> },
-                         { label: 'Academic Year', value: '2nd Year (Bachelor)', icon: <Calendar size={18} className="text-pink-500" /> },
-                         { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={18} className="text-green-500" /> },
-                         { label: 'Gmail', value: 'maishazaman1502@gmail.com', icon: <Mail size={18} className="text-blue-500" />, span: true },
+                         { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
+                         { label: 'Institution', value: 'Govt. Titumir College', icon: <GraduationCap size={20} className="text-indigo-500" /> },
+                         { label: 'Academic Year', value: '2nd Year (Bachelor)', icon: <Calendar size={20} className="text-pink-500" /> },
+                         { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={20} className="text-green-500" /> },
+                         { label: 'Gmail Address', value: 'maishazaman1502@gmail.com', icon: <Mail size={20} className="text-blue-500" />, span: true },
                        ].map((item) => (
-                         <div key={item.label} className={`relative group ${item.span ? 'sm:col-span-2' : ''}`}>
-                           <div className="flex items-center gap-2.5 mb-2.5">
-                              <div className="flex items-center justify-center">
-                                {item.icon}
-                              </div>
+                         <div key={item.label} className={`flex flex-col items-start ${item.span ? 'sm:col-span-2' : ''}`}>
+                           <div className="flex items-center gap-3 mb-3">
+                              <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">{item.icon}</div>
                               <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{item.label}</span>
                            </div>
-                           <p className="text-lg font-bold text-slate-800 group-hover:text-purple-600 transition-colors break-words leading-tight pl-0.5">
+                           <p className="text-lg font-bold text-slate-800 leading-tight break-all">
                              {item.value}
                            </p>
                          </div>
                        ))}
                     </div>
                     
-                    <div className="mt-16 pt-10 border-t border-slate-200/50 flex flex-wrap gap-3">
+                    <div className="mt-16 pt-10 border-t border-slate-200/50 flex flex-wrap gap-2.5">
                        {['Macroeconomics', 'Civic Analysis', 'Fabric Texture Art', 'Psychology', 'English Medium'].map(skill => (
-                         <span key={skill} className="px-5 py-2 glass bg-white/60 rounded-2xl text-[11px] font-bold text-slate-600 border border-slate-100/50 hover:bg-white hover:border-purple-200 transition-all cursor-default shadow-sm">
+                         <span key={skill} className="px-4 py-2 glass bg-white/70 rounded-xl text-[10px] font-bold text-slate-600 border border-slate-200/50 shadow-sm hover:border-purple-300 transition-colors cursor-default">
                            {skill}
                          </span>
                        ))}
@@ -594,11 +542,11 @@ const App: React.FC = () => {
                </div>
             </GlassCard>
 
-            <div className="lg:col-span-4 flex flex-col gap-6">
-               <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="glass p-10 rounded-[48px] border border-white/60 shadow-xl bg-gradient-to-br from-white to-indigo-50/30 flex-1">
+            <div className="lg:col-span-4 flex flex-col gap-8">
+               <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="glass p-10 rounded-[48px] border border-white/60 shadow-xl bg-gradient-to-br from-white to-purple-50/30 flex-1">
                   <div className="flex items-center justify-between mb-10">
-                    <h4 className="text-2xl font-serif font-bold text-slate-800">Performance</h4>
-                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                    <h4 className="text-2xl font-serif font-bold text-slate-800">Capabilities</h4>
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 shadow-sm">
                       <Zap size={20} />
                     </div>
                   </div>
@@ -611,25 +559,25 @@ const App: React.FC = () => {
                       <div key={s.skill}>
                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
                           <span className="text-slate-400">{s.skill}</span>
-                          <span className="text-slate-900">{s.level}</span>
+                          <span className="text-slate-900 font-bold">{s.level}</span>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
-                          <motion.div initial={{ width: 0 }} whileInView={{ width: s.level }} transition={{ duration: 1.5 }} className={`h-full bg-gradient-to-r ${s.color} rounded-full`} />
+                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} whileInView={{ width: s.level }} transition={{ duration: 1.5, ease: "circOut" }} className={`h-full bg-gradient-to-r ${s.color} rounded-full`} />
                         </div>
                       </div>
                     ))}
                   </div>
                </motion.div>
                
-               <motion.div 
-                 onClick={() => setShowHireModal(true)} 
-                 className="p-8 rounded-[40px] bg-slate-900 text-white flex flex-col justify-center items-center text-center group cursor-pointer hover:shadow-2xl transition-all border border-slate-800"
-               >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-                    <span className="text-xl font-bold">Hire Maisha</span>
+               <motion.div onClick={() => setShowHireModal(true)} className="p-8 rounded-[40px] bg-slate-900 text-white flex flex-col justify-center items-center text-center group cursor-pointer hover:shadow-2xl transition-all border border-slate-800 overflow-hidden relative">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                      <span className="text-2xl font-bold">Hire Maisha</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-bold tracking-widest uppercase">Student Home & Private Tuition</p>
                   </div>
-                  <p className="text-xs text-slate-400 font-medium">Available for Home & Private Tuition</p>
                </motion.div>
             </div>
           </div>
@@ -637,62 +585,65 @@ const App: React.FC = () => {
 
         {/* Teaching Services */}
         <section id="tuition">
-          <div className="text-center mb-20"><h2 className="text-4xl md:text-5xl font-serif font-bold mb-4">Teaching Services</h2><p className="text-slate-500">Expert guidance for English Version students in core subjects.</p></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="text-center mb-20"><h2 className="text-4xl md:text-5xl font-serif font-bold mb-4 text-slate-900">Teaching Services</h2><p className="text-slate-500 font-medium">Expert guidance tailored for English Version students.</p></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {SERVICES.map((service, idx) => (
               <GlassCard key={service.title} delay={idx * 0.1}>
-                <h3 className="text-xl font-bold mb-6 text-purple-600">{service.title}</h3>
-                <ul className="space-y-4">{service.items.map((item) => (<li key={item} className="flex items-center gap-3 text-slate-600 text-sm font-medium"><div className="w-1.5 h-1.5 bg-purple-300 rounded-full" />{item}</li>))}</ul>
+                <h3 className="text-xl font-bold mb-8 text-purple-600 border-b border-purple-100 pb-4">{service.title}</h3>
+                <ul className="space-y-5">{service.items.map((item) => (<li key={item} className="flex items-center gap-4 text-slate-600 text-sm font-semibold"><div className="w-2 h-2 bg-purple-400 rounded-full shadow-sm" />{item}</li>))}</ul>
               </GlassCard>
             ))}
           </div>
         </section>
 
-        {/* Contact Form Section */}
+        {/* Contact Form */}
         <section id="contact">
-          <GlassCard className="!p-0 overflow-hidden border-purple-100">
+          <GlassCard className="!p-0 overflow-hidden border-purple-100 shadow-3xl">
             <div className="grid grid-cols-1 lg:grid-cols-2">
-              <div className="p-12 lg:p-20 bg-slate-900 text-white"><h2 className="text-5xl font-serif font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-peach-300">Let's Connect</h2><div className="space-y-8">{SOCIALS.map((link) => (<a key={link.platform} href={link.url} target="_blank" className="flex items-center space-x-6 group"><div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 transition-all">{link.icon === 'Facebook' && <Facebook size={26} />}{link.icon === 'Mail' && <Mail size={26} />}{link.icon === 'Phone' && <Phone size={26} />}</div><span className="text-lg font-bold group-hover:text-purple-400">{link.platform}</span></a>))}</div></div>
-              <div className="p-12 lg:p-20 bg-white/40"><form className="space-y-8" onSubmit={handleContactSubmit}><div className="grid grid-cols-1 sm:grid-cols-2 gap-8"><div><label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Your Name</label><input name="name" required type="text" className="w-full bg-white/80 border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600" placeholder="e.g. Abdullah" /></div><div><label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Your Phone</label><input name="phone" required type="tel" className="w-full bg-white/80 border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600" placeholder="017xxxxxxxx" /></div></div><div><label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Your Message</label><textarea name="inquiry" required className="w-full bg-white/80 border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 h-32 resize-none" placeholder="Write something..." /></div><button type="submit" className="w-full bg-purple-600 text-white py-6 rounded-2xl font-bold tracking-widest shadow-2xl hover:bg-purple-700 transition-all active:scale-95">SEND INQUIRY</button></form></div>
+              <div className="p-12 lg:p-20 bg-slate-900 text-white relative">
+                 <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
+                 <h2 className="text-5xl font-serif font-bold mb-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-peach-300 relative z-10">Let's Connect</h2>
+                 <div className="space-y-10 relative z-10">{SOCIALS.map((link) => (<a key={link.platform} href={link.url} target="_blank" className="flex items-center space-x-6 group"><div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 group-hover:border-transparent transition-all shadow-xl">{link.icon === 'Facebook' && <Facebook size={28} />}{link.icon === 'Mail' && <Mail size={28} />}{link.icon === 'Phone' && <Phone size={28} />}</div><span className="text-xl font-bold group-hover:text-purple-400 transition-colors">{link.platform}</span></a>))}</div>
+              </div>
+              <div className="p-12 lg:p-20 bg-white/40 backdrop-blur-3xl"><form className="space-y-10" onSubmit={handleContactSubmit}><div className="grid grid-cols-1 sm:grid-cols-2 gap-10"><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Name</label><input name="name" required type="text" className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 text-slate-900 font-bold transition-colors" placeholder="e.g. Abdullah" /></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Phone</label><input name="phone" required type="tel" className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 text-slate-900 font-bold transition-colors" placeholder="017xxxxxxxx" /></div></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Your Message</label><textarea name="inquiry" required className="w-full bg-transparent border-b-2 border-slate-200 py-4 outline-none focus:border-purple-600 h-32 resize-none text-slate-900 font-bold transition-colors" placeholder="Write something..." /></div><button type="submit" className="w-full bg-purple-600 text-white py-6 rounded-2xl font-bold tracking-[0.2em] shadow-2xl hover:bg-purple-700 active:scale-[0.98] transition-all">SEND INQUIRY</button></form></div>
             </div>
           </GlassCard>
         </section>
       </main>
 
-      {/* Hire Me Popup */}
+      {/* Modals */}
       <AnimatePresence>{showHireModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowHireModal(false)} className="absolute inset-0 bg-purple-900/40 backdrop-blur-md" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowHireModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
           <motion.div initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 50 }} className="relative glass p-10 rounded-[48px] max-w-lg w-full shadow-3xl border border-white/60">
-             <div className="flex justify-between items-center mb-8"><h2 className="text-4xl font-serif font-bold text-slate-900">Hire Maisha</h2><button onClick={() => setShowHireModal(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button></div>
+             <div className="flex justify-between items-center mb-8"><h2 className="text-4xl font-serif font-bold text-slate-900">Hire Maisha</h2><button onClick={() => setShowHireModal(false)} className="bg-slate-100 p-2 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X size={20} /></button></div>
              <div className="space-y-6">
                 <a href={`tel:${PERSONAL_INFO.phone}`} className="flex items-center justify-between p-6 bg-green-500 text-white rounded-3xl shadow-xl hover:bg-green-600 transition-all group"><div className="flex items-center gap-4"><div className="bg-white/20 p-3 rounded-2xl"><Phone size={24} /></div><div><p className="font-bold text-lg">Direct Call</p><p className="text-xs font-black uppercase tracking-widest">{PERSONAL_INFO.phone}</p></div></div><ExternalLink size={20} /></a>
                 <div className="relative py-4"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div><div className="relative flex justify-center text-xs uppercase font-black text-slate-400 tracking-[0.3em]"><span className="bg-[#fdfaf7] px-4">OR</span></div></div>
-                <form onSubmit={handleHireSubmit} className="space-y-4"><div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-2">Your Phone</label><input name="phone" required type="tel" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" placeholder="017..." /></div><div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-2">Tuition Brief</label><textarea name="message" required className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none h-28 resize-none" placeholder="Class, Subject, and Preferred Timing..." /></div><button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold tracking-widest shadow-xl flex items-center justify-center gap-3"><MessageCircle size={20} /> SEND REQUEST</button></form>
+                <form onSubmit={handleHireSubmit} className="space-y-4"><div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-2">Your Phone</label><input name="phone" required type="tel" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none focus:ring-2 ring-purple-100" placeholder="017..." /></div><div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 ml-2">Tuition Brief</label><textarea name="message" required className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none h-28 resize-none focus:ring-2 ring-purple-100" placeholder="Class, Subject, and Timing..." /></div><button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"><MessageCircle size={20} /> SEND REQUEST</button></form>
              </div>
           </motion.div>
         </div>
       )}</AnimatePresence>
 
-      {/* Admin Login Modal */}
       <AnimatePresence>{showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowLoginModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-          <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="relative glass p-10 rounded-[40px] max-w-md w-full border border-white/40">
-             <div className="flex justify-between items-center mb-10"><h2 className="text-3xl font-serif font-bold">Admin Login</h2><button onClick={() => setShowLoginModal(false)}><X size={24} /></button></div>
+          <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="relative glass p-10 rounded-[40px] max-w-md w-full border border-white/40 shadow-3xl">
+             <div className="flex justify-between items-center mb-10"><h2 className="text-3xl font-serif font-bold text-slate-900">Admin Login</h2><button onClick={() => setShowLoginModal(false)}><X size={24} /></button></div>
              <form className="space-y-8" onSubmit={handleLogin}>
-               <div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Username</label><input required value={username} onChange={e => setUsername(e.target.value)} type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none focus:border-purple-500" placeholder="M. ZAMAN" /></div>
-               <div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Password</label><input required value={password} onChange={e => setPassword(e.target.value)} type="password" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none focus:border-purple-500" placeholder="••••••••" /></div>
-               <button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold tracking-widest shadow-xl hover:bg-slate-800 transition-all">SIGN IN</button>
+               <div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Username</label><input required value={username} onChange={e => setUsername(e.target.value)} type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none focus:border-purple-500 font-bold" placeholder="M. ZAMAN" /></div>
+               <div><label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Password</label><input required value={password} onChange={e => setPassword(e.target.value)} type="password" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none focus:border-purple-500 font-bold" placeholder="••••••••" /></div>
+               <button className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95">SIGN IN</button>
              </form>
           </motion.div>
         </div>
       )}</AnimatePresence>
 
-      <footer className="py-20 border-t border-slate-200 bg-white/20">
+      <footer className="py-20 border-t border-slate-200 bg-white/30 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <div className="text-3xl font-serif font-bold text-slate-900 mb-6 uppercase tracking-[0.3em]">M. Zaman</div>
-          <p className="text-slate-400 text-sm">&copy; 2024 Maisha Zaman. Academic Portfolio & Visionary Identity.</p>
+          <div className="text-3xl font-serif font-bold text-slate-900 mb-6 uppercase tracking-[0.4em]">M. Zaman</div>
+          <p className="text-slate-400 text-sm font-medium">&copy; 2024 Maisha Zaman. Economics Scholar & Visionary Artist.</p>
         </div>
       </footer>
 
