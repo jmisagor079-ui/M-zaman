@@ -1,3 +1,4 @@
+
 import { BookOpen, Palette, GraduationCap, User, MapPin, Mail, Phone, Facebook } from 'lucide-react';
 import { Service, EducationItem, SocialLink } from './types';
 
@@ -7,13 +8,6 @@ export const COLORS = {
   peach: '#FFDAB9',
   accent: '#A78BFA', // Purple-400
 };
-
-/**
- * GLOBAL VERCEL BLOB SYNC CONFIG
- * This URL acts as the persistent JSON store for all messages, gallery items, and site settings.
- * It ensures that changes made by the admin are universal and visitor inquiries are permanent.
- */
-export const GLOBAL_BLOB_STORE_URL = 'https://api.npoint.io/7584102877a118821943';
 
 export const SERVICES: Service[] = [
   {
