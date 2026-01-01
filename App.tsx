@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, Palette, GraduationCap, MapPin, Phone, Mail, 
   Facebook, User, Calendar, Briefcase, Clock, DollarSign, 
-  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2, Share2, Copy, Check, Terminal, Rocket
+  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2, Share2, Copy, Check, Terminal, Rocket, Globe, RefreshCcw
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import ThreeBackground from './components/ThreeBackground';
 import GlassCard from './components/GlassCard';
-import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
+import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO, CLOUD_SYNC_URL } from './constants';
 import { Message, ArtWork } from './types';
 
 interface IdentityItem {
@@ -25,28 +25,57 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery'>('home');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [showSyncCode, setShowSyncCode] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Persistence: Admin local edits
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('maisha_messages');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [heroImages, setHeroImages] = useState<string[]>(() => {
-    const saved = localStorage.getItem('maisha_hero_imgs');
-    return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"];
-  });
-  
-  const [artGallery, setArtGallery] = useState<ArtWork[]>(() => {
-    const saved = localStorage.getItem('maisha_art');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
-      { id: '2', url: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?q=80&w=600', title: 'Golden Strokes', description: 'Acrylic fabric painting experiment.', comments: [] },
-      { id: '3', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=600', title: 'Abstract Crimson', description: 'Cotton dupatta design.', comments: [] }
-    ];
-  });
+  // --- STATE WITH CLOUD PERSISTENCE ---
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [heroImages, setHeroImages] = useState<string[]>(["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"]);
+  const [artGallery, setArtGallery] = useState<ArtWork[]>([
+    { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
+    { id: '2', url: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?q=80&w=600', title: 'Golden Strokes', description: 'Acrylic fabric painting experiment.', comments: [] },
+    { id: '3', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=600', title: 'Abstract Crimson', description: 'Cotton dupatta design.', comments: [] }
+  ]);
+
+  // Fetch Global State from Cloud on Load
+  useEffect(() => {
+    const fetchCloudData = async () => {
+      try {
+        const response = await fetch(CLOUD_SYNC_URL);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.heroImages) setHeroImages(data.heroImages);
+          if (data.artGallery) setArtGallery(data.artGallery);
+          if (data.messages) setMessages(data.messages);
+        }
+      } catch (err) {
+        console.warn("Cloud Fetch Failed: Falling back to local data.");
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+    fetchCloudData();
+  }, []);
+
+  // Global Sync Function: Admin Pushes to Cloud
+  const syncToCloud = async (currentHero: string[], currentArt: ArtWork[], currentMsgs: Message[]) => {
+    setIsSyncing(true);
+    try {
+      await fetch(CLOUD_SYNC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ heroImages: currentHero, artGallery: currentArt, messages: currentMsgs }),
+      });
+      setStatusMsg({ text: 'Cloud Updated Successfully', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 3000);
+    } catch (err) {
+      console.error("Sync Error:", err);
+      setStatusMsg({ text: 'Sync Error. Check Connection.', type: 'error' });
+      setTimeout(() => setStatusMsg(null), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -57,18 +86,6 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const artDescRef = useRef<HTMLTextAreaElement>(null);
   const artTitleRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    localStorage.setItem('maisha_messages', JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem('maisha_hero_imgs', JSON.stringify(heroImages));
-  }, [heroImages]);
-
-  useEffect(() => {
-    localStorage.setItem('maisha_art', JSON.stringify(artGallery));
-  }, [artGallery]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -85,36 +102,6 @@ const App: React.FC = () => {
     }
   }, [heroImages]);
 
-  // TOOLKIT: Generate the code for constants.tsx to update visitors globally
-  const generateProductionCode = () => {
-    const code = `
-import { BookOpen, Palette, GraduationCap, User, MapPin, Mail, Phone, Facebook } from 'lucide-react';
-import { Service, EducationItem, SocialLink } from './types';
-
-export const COLORS = { lavender: '#E6E6FA', cream: '#FFFDD0', peach: '#FFDAB9', accent: '#A78BFA' };
-
-export const SERVICES: Service[] = ${JSON.stringify(SERVICES, null, 2)};
-
-export const EDUCATION: EducationItem = {
-  degree: 'Bachelor/Honors (2nd Year)',
-  institute: 'Govt. Titumir College',
-  year: '2024',
-  result: 'CGPA 3.67',
-  group: 'Economics',
-  curriculum: 'English Version'
-};
-
-export const SOCIALS: SocialLink[] = ${JSON.stringify(SOCIALS, null, 2)};
-
-export const PERSONAL_INFO = ${JSON.stringify(PERSONAL_INFO, null, 2)};
-
-export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
-    `;
-    navigator.clipboard.writeText(code.trim());
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 3000);
-  };
-
   const generateAiDescription = async () => {
     const title = artTitleRef.current?.value;
     if (!title) return;
@@ -123,7 +110,7 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words.`,
+        contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for art titled "${title}". Keep it under 20 words.`,
       });
       if (artDescRef.current) artDescRef.current.value = response.text || "";
     } catch (error) {
@@ -133,42 +120,44 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
     }
   };
 
-  const saveMessage = (msg: Omit<Message, 'id' | 'timestamp'>) => {
+  const saveMessage = async (msg: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = { ...msg, id: Math.random().toString(36).substr(2, 9), timestamp: new Date().toLocaleString() };
-    setMessages(prev => [newMessage, ...prev]);
+    const updatedMsgs = [newMessage, ...messages];
+    setMessages(updatedMsgs);
+    
+    // Automatically Sync Visitor Message to Cloud so Admin can see it
+    await syncToCloud(heroImages, artGallery, updatedMsgs);
+    
     setStatusMsg({ text: 'Message delivered', type: 'success' });
     setTimeout(() => setStatusMsg(null), 4000);
   };
 
-  const deleteMessage = (id: string) => setMessages(prev => prev.filter(m => m.id !== id));
+  const deleteMessage = (id: string) => {
+    const updated = messages.filter(m => m.id !== id);
+    setMessages(updated);
+    if (isAdmin) syncToCloud(heroImages, artGallery, updated);
+  };
 
   const addHeroImage = (url: string) => {
     if (heroImages.length >= 3) return;
-    setHeroImages(prev => [...prev, url]);
-    setStatusMsg({ text: 'Hero Image Added', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 3000);
+    const updated = [...heroImages, url];
+    setHeroImages(updated);
+    if (isAdmin) syncToCloud(updated, artGallery, messages);
   };
 
   const removeHeroImage = (index: number) => {
     if (heroImages.length <= 1) return;
-    setHeroImages(prev => prev.filter((_, i) => i !== index));
+    const updated = heroImages.filter((_, i) => i !== index);
+    setHeroImages(updated);
     setCurrentHeroIndex(0);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => addHeroImage(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    if (isAdmin) syncToCloud(updated, artGallery, messages);
   };
 
   const addArt = (url: string, title: string, desc: string) => {
     const newArt: ArtWork = { id: Math.random().toString(36).substr(2, 9), url, title, description: desc, comments: [] };
-    setArtGallery(prev => [newArt, ...prev]);
-    setStatusMsg({ text: 'New Art Uploaded', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 3000);
+    const updated = [newArt, ...artGallery];
+    setArtGallery(updated);
+    if (isAdmin) syncToCloud(heroImages, updated, messages);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -213,10 +202,18 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
             </div>
             <div className="flex items-center gap-4">
               <button 
+                onClick={() => syncToCloud(heroImages, artGallery, messages)}
+                disabled={isSyncing}
+                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50"
+              >
+                {isSyncing ? <RefreshCcw size={16} className="animate-spin" /> : <Globe size={16} />}
+                {isSyncing ? 'Pushing Updates...' : 'Publish Global Updates'}
+              </button>
+              <button 
                 onClick={() => setAdminTab(adminTab === 'messages' ? 'settings' : 'messages')}
                 className="px-4 py-2 glass rounded-xl text-xs font-bold uppercase tracking-widest text-slate-600"
               >
-                {adminTab === 'messages' ? 'Update Content' : 'View Inbox'}
+                {adminTab === 'messages' ? 'Update Site' : 'View Inbox'}
               </button>
               <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-full font-bold text-xs tracking-widest hover:bg-slate-800 transition-all">
                 <LogOut size={16} /> LOGOUT
@@ -229,9 +226,9 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
           <AnimatePresence mode="wait">
             {adminTab === 'messages' ? (
               <motion.div key="msgs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <div className="mb-12"><h1 className="text-5xl font-serif font-bold mb-2 text-slate-900">Message Inbox</h1><p className="text-slate-500 font-medium">Managing {messages.length} student inquiries.</p></div>
+                <div className="mb-12"><h1 className="text-5xl font-serif font-bold mb-2 text-slate-900">Message Inbox</h1><p className="text-slate-500 font-medium">All student inquiries submitted via Vercel link.</p></div>
                 <div className="grid grid-cols-1 gap-6">
-                  {messages.length === 0 ? <GlassCard className="text-center py-20"><p className="text-slate-400">No messages yet.</p></GlassCard> : messages.map((msg) => (
+                  {messages.length === 0 ? <GlassCard className="text-center py-20"><p className="text-slate-400">No client messages yet.</p></GlassCard> : messages.map((msg) => (
                     <div key={msg.id} className="glass p-8 rounded-[32px] border border-white/50 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3"><span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${msg.type === 'Inquiry' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>{msg.type}</span><span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock size={12} /> {msg.timestamp}</span></div>
@@ -245,19 +242,12 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
             ) : (
               <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-12">
                 <div className="flex justify-between items-end">
-                  <div><h1 className="text-5xl font-serif font-bold mb-2">Visual Content</h1><p className="text-slate-500">Edit images and art live.</p></div>
-                  <button 
-                    onClick={generateProductionCode}
-                    className={`flex items-center gap-2 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${copySuccess ? 'bg-green-500 text-white' : 'bg-purple-600 text-white shadow-xl hover:bg-purple-700'}`}
-                  >
-                    {copySuccess ? <Check size={16} /> : <Rocket size={16} />}
-                    {copySuccess ? 'Updated Code Copied!' : 'Publish to Global Link'}
-                  </button>
+                  <div><h1 className="text-5xl font-serif font-bold mb-2">Visual Content</h1><p className="text-slate-500">Edit hero images and gallery globally.</p></div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <GlassCard className="space-y-6">
-                    <div className="flex items-center justify-between"><div className="flex items-center gap-3 text-purple-600"><ImageIcon size={24} /><h3 className="text-xl font-bold">Hero Images</h3></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{heroImages.length}/3 Images</span></div>
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-3 text-purple-600"><ImageIcon size={24} /><h3 className="text-xl font-bold">Hero Carousel</h3></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{heroImages.length}/3 Images</span></div>
                     <div className="grid grid-cols-3 gap-4">
                       {heroImages.map((img, i) => (
                         <div key={i} className="relative aspect-[4/5] rounded-xl overflow-hidden group border border-slate-100 shadow-inner">
@@ -266,13 +256,13 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
                       ))}
                     </div>
                     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); const url = (e.currentTarget.elements.namedItem('imgurl') as HTMLInputElement).value; if(url) { addHeroImage(url); (e.currentTarget.elements.namedItem('imgurl') as HTMLInputElement).value = ''; } }}>
-                      <input name="imgurl" type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" placeholder="Paste image link here..." />
-                      <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold tracking-widest hover:bg-purple-600 transition-all">ADD IMAGE</button>
+                      <input name="imgurl" type="text" className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" placeholder="Paste image URL here..." />
+                      <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold tracking-widest hover:bg-purple-600 transition-all">ADD TO HERO</button>
                     </form>
                   </GlassCard>
 
                   <GlassCard className="space-y-6">
-                    <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-3 text-orange-600"><Palette size={24} /><h3 className="text-xl font-bold">New Art</h3></div><button onClick={generateAiDescription} disabled={isAiLoading} className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50">{isAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Insight</button></div>
+                    <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-3 text-orange-600"><Palette size={24} /><h3 className="text-xl font-bold">New Artwork</h3></div><button onClick={generateAiDescription} disabled={isAiLoading} className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50">{isAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Descriptor</button></div>
                     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const url = (f.elements.namedItem('arturl') as HTMLInputElement).value; const title = (f.elements.namedItem('arttitle') as HTMLInputElement).value; const desc = (f.elements.namedItem('artdesc') as HTMLTextAreaElement).value; if(url && title) { addArt(url, title, desc); f.reset(); } }}>
                       <div className="grid grid-cols-2 gap-4"><input name="arturl" required placeholder="Image URL" className="glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" /><input ref={artTitleRef} name="arttitle" required placeholder="Art Title" className="glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none" /></div>
                       <textarea ref={artDescRef} name="artdesc" placeholder="Poetic description..." className="w-full glass bg-white/50 border border-slate-200 p-4 rounded-2xl outline-none h-24 resize-none" /><button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold tracking-widest hover:bg-orange-500 transition-all">UPLOAD TO GALLERY</button>
@@ -280,11 +270,11 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
                   </GlassCard>
                 </div>
                 
-                <div className="p-8 bg-slate-900 rounded-[40px] border border-slate-800 flex items-center gap-8">
-                   <div className="p-6 bg-purple-500/10 rounded-3xl text-purple-400"><Terminal size={40} /></div>
+                <div className="p-8 bg-indigo-900/10 rounded-[40px] border border-indigo-100 flex items-center gap-8">
+                   <div className="p-6 bg-indigo-600 text-white rounded-3xl"><Globe size={40} /></div>
                    <div className="flex-1">
-                      <h4 className="text-xl font-bold text-white mb-1">Make these changes Global</h4>
-                      <p className="text-slate-400 text-sm leading-relaxed">Changes you make here are only stored in your browser. To show these new pictures to everyone visiting your Vercel link, click the <b>"Publish to Global Link"</b> button above, then paste that code into your <b>constants.tsx</b> file and push to GitHub.</p>
+                      <h4 className="text-xl font-bold text-slate-900 mb-1">Universal Sync Active</h4>
+                      <p className="text-slate-500 text-sm leading-relaxed">Changes you make here are synchronized with the cloud. All visitors opening your Vercel URL on any device will see these updates instantly. Client comments are also synced back to your inbox automatically.</p>
                    </div>
                 </div>
               </motion.div>
@@ -300,7 +290,7 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
       <div className="min-h-screen relative text-slate-800 selection:bg-purple-200">
         <ThreeBackground />
         <nav className="fixed top-0 w-full z-50 glass py-4 shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 flex justify-between items-center"><button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-900 font-bold hover:text-purple-600 transition-colors"><ArrowLeft size={24} /> BACK HOME</button><div className="text-xl font-serif font-bold tracking-widest">CREATIVE GALLERY</div></div>
+          <div className="max-w-7xl mx-auto px-6 flex justify-between items-center"><button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-900 font-bold hover:text-purple-600 transition-colors"><ArrowLeft size={24} /> BACK HOME</button><div className="text-xl font-serif font-bold tracking-widest uppercase">Creative Gallery</div></div>
         </nav>
         <main className="max-w-7xl mx-auto px-6 pt-32 pb-32">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
@@ -310,7 +300,7 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
                    <div className="aspect-[4/3] overflow-hidden"><img src={art.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={art.title} /></div>
                    <div className="p-8"><h3 className="text-2xl font-serif font-bold mb-2">{art.title}</h3><p className="text-slate-500 text-sm mb-6 leading-relaxed italic">"{art.description}"</p>
                       <div className="pt-4 border-t border-slate-100"><div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4"><MessageCircle size={14} /> {art.comments?.length || 0} Comments</div>
-                         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const text = (f.elements.namedItem('cmt') as HTMLInputElement).value; if(text) { const updated = artGallery.map(a => a.id === art.id ? {...a, comments: [...(a.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}]} : a); setArtGallery(updated); f.reset(); } }}>
+                         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const text = (f.elements.namedItem('cmt') as HTMLInputElement).value; if(text) { const updated = artGallery.map(a => a.id === art.id ? {...a, comments: [...(a.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}]} : a); setArtGallery(updated); syncToCloud(heroImages, updated, messages); f.reset(); } }}>
                             <input name="cmt" placeholder="Share your thoughts..." className="flex-1 glass bg-white/50 border-none px-4 py-2 rounded-xl outline-none text-xs focus:ring-1 ring-purple-400" /><button type="submit" className="p-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"><Send size={16} /></button>
                          </form>
                       </div>
@@ -348,7 +338,7 @@ export const LOCATIONS = ${JSON.stringify(LOCATIONS, null, 2)};
           </motion.div>
         </section>
 
-        {/* Professional Identity with FIXED SYNTAX for long text */}
+        {/* Professional Identity with FIXED SYNTAX for long text wrapping */}
         <section id="about" className="relative">
           <div className="mb-20 text-center lg:text-left"><h2 className="text-5xl md:text-7xl font-serif font-bold mb-4 tracking-tighter text-slate-900">Professional <span className="text-purple-600 italic">Identity</span></h2><div className="w-32 h-1.5 bg-gradient-to-r from-purple-600 via-pink-400 to-peach-300 rounded-full mx-auto lg:mx-0" /></div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">

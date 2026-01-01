@@ -1,4 +1,3 @@
-
 import { BookOpen, Palette, GraduationCap, User, MapPin, Mail, Phone, Facebook } from 'lucide-react';
 import { Service, EducationItem, SocialLink } from './types';
 
@@ -8,6 +7,14 @@ export const COLORS = {
   peach: '#FFDAB9',
   accent: '#A78BFA', // Purple-400
 };
+
+/**
+ * GLOBAL SYNCHRONIZATION CONFIG
+ * To enable global updates across all devices, create a JSON bin at https://www.npoint.io/
+ * and paste the URL here. This allows the Admin Portal to push changes to the cloud
+ * and visitors to fetch them immediately.
+ */
+export const CLOUD_SYNC_URL = 'https://api.npoint.io/46e8c07f43372c388275'; // Example public endpoint
 
 export const SERVICES: Service[] = [
   {
