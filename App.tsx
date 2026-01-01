@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, Palette, GraduationCap, MapPin, Phone, Mail, 
   Facebook, User, Calendar, Briefcase, Clock, DollarSign, 
-  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
+  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2, Share2, Copy, Check
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import ThreeBackground from './components/ThreeBackground';
@@ -11,7 +11,6 @@ import GlassCard from './components/GlassCard';
 import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
 import { Message, ArtWork } from './types';
 
-// Interface for Professional Identity mapping
 interface IdentityItem {
   label: string;
   value: string;
@@ -26,19 +25,40 @@ const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [view, setView] = useState<'home' | 'gallery'>('home');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
-  // Persistence Fix: Using lazy state initialization
+  // --- STATE PERSISTENCE LOGIC ---
+  
+  // Helper to decode state from URL hash
+  const getInitialStateFromUrl = () => {
+    try {
+      const hash = window.location.hash.substring(1);
+      if (hash.startsWith('data=')) {
+        const encodedData = hash.replace('data=', '');
+        const decodedData = JSON.parse(atob(encodedData));
+        return decodedData;
+      }
+    } catch (e) {
+      console.error("Failed to parse state from URL", e);
+    }
+    return null;
+  };
+
+  const urlState = getInitialStateFromUrl();
+
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = localStorage.getItem('maisha_messages');
     return saved ? JSON.parse(saved) : [];
   });
   
   const [heroImages, setHeroImages] = useState<string[]>(() => {
+    if (urlState?.heroImages) return urlState.heroImages;
     const saved = localStorage.getItem('maisha_hero_imgs');
     return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"];
   });
   
   const [artGallery, setArtGallery] = useState<ArtWork[]>(() => {
+    if (urlState?.artGallery) return urlState.artGallery;
     const saved = localStorage.getItem('maisha_art');
     return saved ? JSON.parse(saved) : [
       { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
@@ -84,6 +104,19 @@ const App: React.FC = () => {
     }
   }, [heroImages]);
 
+  // Function to generate a shareable link with current state
+  const generateShareableLink = () => {
+    const state = {
+      heroImages,
+      artGallery
+    };
+    const encoded = btoa(JSON.stringify(state));
+    const url = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
+    navigator.clipboard.writeText(url);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 3000);
+  };
+
   const generateAiDescription = async () => {
     const title = artTitleRef.current?.value;
     if (!title) {
@@ -103,7 +136,6 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      alert("Could not connect to Visionary AI. Check API Key configuration.");
     } finally {
       setIsAiLoading(false);
     }
@@ -203,7 +235,6 @@ const App: React.FC = () => {
     e.currentTarget.reset();
   };
 
-  // Defining identity items with improved layout syntax to prevent clipping
   const identityItems: IdentityItem[] = [
     { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
     { label: 'Institution', value: EDUCATION.institute, icon: <GraduationCap size={20} className="text-indigo-500" /> },
@@ -223,6 +254,13 @@ const App: React.FC = () => {
                <span>ADMIN PORTAL</span>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                onClick={generateShareableLink}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${copySuccess ? 'bg-green-500 text-white' : 'glass text-slate-600 hover:bg-white/50'}`}
+              >
+                {copySuccess ? <Check size={14} /> : <Share2 size={14} />}
+                {copySuccess ? 'Link Copied!' : 'Copy Shareable Link'}
+              </button>
               <button 
                 onClick={() => setAdminTab(adminTab === 'messages' ? 'settings' : 'messages')}
                 className="px-4 py-2 glass rounded-xl text-xs font-bold uppercase tracking-widest text-slate-600"
@@ -270,9 +308,15 @@ const App: React.FC = () => {
               </motion.div>
             ) : (
               <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-12">
-                <div>
-                  <h1 className="text-5xl font-serif font-bold mb-2">Site Management</h1>
-                  <p className="text-slate-500">Update your visuals and gallery.</p>
+                <div className="flex justify-between items-end">
+                  <div>
+                    <h1 className="text-5xl font-serif font-bold mb-2">Site Management</h1>
+                    <p className="text-slate-500">Update your visuals and gallery.</p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl flex items-center gap-3 max-w-sm">
+                    <div className="p-2 bg-orange-100 rounded-lg text-orange-600"><Share2 size={16} /></div>
+                    <p className="text-[10px] font-bold text-orange-800 uppercase leading-tight">Note: Use "Copy Shareable Link" at the top to let visitors see your new uploads!</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -536,7 +580,7 @@ const App: React.FC = () => {
                               <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">{item.icon}</div>
                               <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{item.label}</span>
                            </div>
-                           <p className="text-lg font-bold text-slate-800 leading-tight break-words hyphens-none">
+                           <p className="text-lg font-bold text-slate-800 leading-tight break-words whitespace-normal">
                              {item.value}
                            </p>
                          </div>
