@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -6,10 +7,16 @@ import {
   ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from '@supabase/supabase-js';
 import ThreeBackground from './components/ThreeBackground';
 import GlassCard from './components/GlassCard';
 import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
-import { Message, ArtWork } from './types';
+import { Message, ArtWork, Comment } from './types';
+
+// Supabase Configuration
+const SUPABASE_URL = 'https://pgqvbmudkjhsmdhkzqzu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBncXZibXVka2poc21kaGt6cXp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczOTUsImV4cCI6MjA4Mjg2MzM5NX0.EegAsIdTfNeAb0diepBuL1ha2aeEEipFwPTeLPWiQa4';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Interface for Professional Identity mapping
 interface IdentityItem {
@@ -27,25 +34,10 @@ const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'gallery'>('home');
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Persistence logic
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('maisha_messages');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [heroImages, setHeroImages] = useState<string[]>(() => {
-    const saved = localStorage.getItem('maisha_hero_imgs');
-    return saved ? JSON.parse(saved) : ["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"];
-  });
-  
-  const [artGallery, setArtGallery] = useState<ArtWork[]>(() => {
-    const saved = localStorage.getItem('maisha_art');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=600', title: 'Blue Lotus', description: 'Hand-painted on pure silk.', comments: [] },
-      { id: '2', url: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?q=80&w=600', title: 'Golden Strokes', description: 'Acrylic fabric painting experiment.', comments: [] },
-      { id: '3', url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=600', title: 'Abstract Crimson', description: 'Cotton dupatta design.', comments: [] }
-    ];
-  });
+  // Cloud Persistence logic via Supabase
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [heroImages, setHeroImages] = useState<string[]>(["https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"]);
+  const [artGallery, setArtGallery] = useState<ArtWork[]>([]);
 
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -57,17 +49,38 @@ const App: React.FC = () => {
   const artDescRef = useRef<HTMLTextAreaElement>(null);
   const artTitleRef = useRef<HTMLInputElement>(null);
 
+  // Fetch initial data from Supabase
   useEffect(() => {
-    localStorage.setItem('maisha_messages', JSON.stringify(messages));
-  }, [messages]);
+    fetchInitialData();
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('maisha_hero_imgs', JSON.stringify(heroImages));
-  }, [heroImages]);
+  const fetchInitialData = async () => {
+    try {
+      // Fetch Messages
+      const { data: msgs, error: msgsError } = await supabase
+        .from('messages')
+        .select('*')
+        .order('timestamp', { ascending: false });
+      if (!msgsError && msgs) setMessages(msgs);
 
-  useEffect(() => {
-    localStorage.setItem('maisha_art', JSON.stringify(artGallery));
-  }, [artGallery]);
+      // Fetch Hero Images
+      const { data: heros, error: herosError } = await supabase
+        .from('hero_settings')
+        .select('url');
+      if (!herosError && heros && heros.length > 0) {
+        setHeroImages(heros.map(h => h.url));
+      }
+
+      // Fetch Art Gallery
+      const { data: arts, error: artsError } = await supabase
+        .from('art_gallery')
+        .select('*')
+        .order('id', { ascending: false });
+      if (!artsError && arts) setArtGallery(arts);
+    } catch (err) {
+      console.error("Supabase fetch error:", err);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -93,8 +106,7 @@ const App: React.FC = () => {
 
     setIsAiLoading(true);
     try {
-      // Fixed syntax to match guidelines
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words. Focus on texture, emotion, and craftsmanship.`,
@@ -109,38 +121,54 @@ const App: React.FC = () => {
     }
   };
 
-  const saveMessage = (msg: Omit<Message, 'id' | 'timestamp'>) => {
-    const newMessage: Message = {
+  const saveMessage = async (msg: Omit<Message, 'id' | 'timestamp'>) => {
+    const newMessage = {
       ...msg,
-      id: Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toLocaleString(),
     };
-    setMessages(prev => [newMessage, ...prev]);
-    setStatusMsg({ text: 'Message delivered', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 4000);
+    
+    const { error } = await supabase.from('messages').insert([newMessage]);
+    
+    if (!error) {
+      fetchInitialData();
+      setStatusMsg({ text: 'Message delivered', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 4000);
+    } else {
+      console.error("Error saving message:", error);
+    }
   };
 
-  const deleteMessage = (id: string) => {
-    setMessages(prev => prev.filter(m => m.id !== id));
+  const deleteMessage = async (id: string) => {
+    const { error } = await supabase.from('messages').delete().eq('id', id);
+    if (!error) {
+      setMessages(prev => prev.filter(m => m.id !== id));
+    }
   };
 
-  const addHeroImage = (url: string) => {
+  const addHeroImage = async (url: string) => {
     if (heroImages.length >= 3) {
       alert("Maximum 3 hero images allowed.");
       return;
     }
-    setHeroImages(prev => [...prev, url]);
-    setStatusMsg({ text: 'Hero Image Added', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 3000);
+    const { error } = await supabase.from('hero_settings').insert([{ url }]);
+    if (!error) {
+      setHeroImages(prev => [...prev, url]);
+      setStatusMsg({ text: 'Hero Image Added', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
   };
 
-  const removeHeroImage = (index: number) => {
+  const removeHeroImage = async (index: number) => {
     if (heroImages.length <= 1) {
       alert("At least one hero image is required.");
       return;
     }
-    setHeroImages(prev => prev.filter((_, i) => i !== index));
-    setCurrentHeroIndex(0);
+    const urlToRemove = heroImages[index];
+    const { error } = await supabase.from('hero_settings').delete().eq('url', urlToRemove);
+    if (!error) {
+      setHeroImages(prev => prev.filter((_, i) => i !== index));
+      setCurrentHeroIndex(0);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,24 +182,41 @@ const App: React.FC = () => {
     }
   };
 
-  const addArt = (url: string, title: string, desc: string) => {
-    const newArt: ArtWork = {
-      id: Math.random().toString(36).substr(2, 9),
+  const addArt = async (url: string, title: string, desc: string) => {
+    const newArt = {
       url,
       title,
       description: desc,
       comments: []
     };
-    setArtGallery(prev => [newArt, ...prev]);
-    setStatusMsg({ text: 'New Art Uploaded', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 3000);
+    
+    const { error } = await supabase.from('art_gallery').insert([newArt]);
+    
+    if (!error) {
+      fetchInitialData();
+      setStatusMsg({ text: 'New Art Uploaded', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
   };
 
-  // User requested ability for admin to delete any art
-  const deleteArt = (id: string) => {
-    setArtGallery(prev => prev.filter(a => a.id !== id));
-    setStatusMsg({ text: 'Art Removed', type: 'success' });
-    setTimeout(() => setStatusMsg(null), 3000);
+  const deleteArt = async (id: string) => {
+    const { error } = await supabase.from('art_gallery').delete().eq('id', id);
+    if (!error) {
+      setArtGallery(prev => prev.filter(a => a.id !== id));
+      setStatusMsg({ text: 'Art Removed', type: 'success' });
+      setTimeout(() => setStatusMsg(null), 3000);
+    }
+  };
+
+  const updateArtComments = async (artId: string, updatedComments: Comment[]) => {
+    const { error } = await supabase
+      .from('art_gallery')
+      .update({ comments: updatedComments })
+      .eq('id', artId);
+    
+    if (!error) {
+      setArtGallery(prev => prev.map(a => a.id === artId ? { ...a, comments: updatedComments } : a));
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -278,7 +323,7 @@ const App: React.FC = () => {
               <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-12">
                 <div>
                   <h1 className="text-5xl font-serif font-bold mb-2">Site Management</h1>
-                  <p className="text-slate-500">Update your visuals and gallery.</p>
+                  <p className="text-slate-500">Update your visuals and gallery (Cloud Sync).</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -358,7 +403,6 @@ const App: React.FC = () => {
                       </button>
                     </form>
 
-                    {/* New Section: Delete Art from Gallery */}
                     <div className="pt-6 border-t border-slate-100">
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Manage Current Artworks</p>
                       <div className="grid grid-cols-4 gap-2">
@@ -412,13 +456,13 @@ const App: React.FC = () => {
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
                             <MessageCircle size={14} /> {art.comments?.length || 0} Comments
                          </div>
-                         <form className="flex gap-2" onSubmit={(e) => {
+                         <form className="flex gap-2" onSubmit={async (e) => {
                            e.preventDefault();
                            const f = e.currentTarget;
                            const text = (f.elements.namedItem('cmt') as HTMLInputElement).value;
                            if(text) {
-                             const updated = artGallery.map(a => a.id === art.id ? {...a, comments: [...(a.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}]} : a);
-                             setArtGallery(updated);
+                             const updatedComments = [...(art.comments || []), {user: 'Visitor', text, date: new Date().toLocaleDateString()}];
+                             updateArtComments(art.id, updatedComments);
                              f.reset();
                            }
                          }}>
@@ -477,7 +521,6 @@ const App: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Hero Image */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }} 
             animate={{ opacity: 1, scale: 1 }} 
@@ -517,7 +560,6 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Identity Section */}
         <section id="about" className="relative">
           <div className="mb-20 text-center lg:text-left">
             <h2 className="text-5xl md:text-7xl font-serif font-bold mb-4 tracking-tighter text-slate-900">Professional <span className="text-purple-600 italic">Identity</span></h2>
@@ -620,7 +662,6 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Teaching Services */}
         <section id="tuition">
           <div className="text-center mb-20"><h2 className="text-4xl md:text-5xl font-serif font-bold mb-4 text-slate-900">Teaching Services</h2><p className="text-slate-500 font-medium">Expert guidance tailored for English Version students.</p></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
@@ -633,7 +674,6 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Contact Form */}
         <section id="contact">
           <GlassCard className="!p-0 overflow-hidden border-purple-100 shadow-3xl">
             <div className="grid grid-cols-1 lg:grid-cols-2">
@@ -648,7 +688,6 @@ const App: React.FC = () => {
         </section>
       </main>
 
-      {/* Modals */}
       <AnimatePresence>{showHireModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-6">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowHireModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
