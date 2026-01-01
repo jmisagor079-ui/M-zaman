@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -88,7 +87,7 @@ const App: React.FC = () => {
 
     setIsAiLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a creative fabric art critic. Write a poetic, one-sentence description for a piece of fabric art titled "${title}". Keep it under 20 words. Focus on texture, emotion, and craftsmanship.`,
@@ -439,9 +438,16 @@ const App: React.FC = () => {
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full max-w-[280px] sm:max-w-md lg:max-w-none mx-auto order-1 lg:order-2">
+          {/* Hero Image with Added 3D Effect */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            whileHover={{ rotateX: 6, rotateY: 6, scale: 1.03 }}
+            style={{ perspective: 1500, transformStyle: "preserve-3d" }}
+            className="relative w-full max-w-[280px] sm:max-w-md lg:max-w-none mx-auto order-1 lg:order-2 cursor-pointer"
+          >
             <div className="absolute -inset-5 lg:-inset-10 bg-gradient-to-tr from-purple-300/30 blur-2xl lg:blur-3xl rounded-full animate-pulse" />
-            <div className="relative glass p-2 lg:p-5 rounded-[24px] lg:rounded-[48px] shadow-2xl overflow-hidden group">
+            <div className="relative glass p-2 lg:p-5 rounded-[24px] lg:rounded-[48px] shadow-2xl overflow-hidden group border border-white/50">
               <div className="overflow-hidden rounded-[20px] lg:rounded-[40px] bg-slate-100 aspect-[4/5] relative">
                 <AnimatePresence mode="wait">
                   <motion.img key={currentHeroIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 1 }} src={heroImages[currentHeroIndex]} alt="Maisha Zaman" className="absolute inset-0 w-full h-full object-cover" />
@@ -454,7 +460,7 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div className="absolute bottom-4 lg:bottom-10 -left-2 lg:-left-6 glass p-2 lg:p-6 rounded-xl lg:rounded-3xl shadow-2xl border border-white/60">
+              <div className="absolute bottom-4 lg:bottom-10 -left-2 lg:-left-6 glass p-2 lg:p-6 rounded-xl lg:rounded-3xl shadow-2xl border border-white/60" style={{ transform: "translateZ(50px)" }}>
                 <div className="flex items-center space-x-2 lg:space-x-4">
                   <div className="bg-green-500 w-2 h-2 lg:w-4 lg:h-4 rounded-full animate-pulse shadow-md" />
                   <div className="text-left font-bold text-[8px] lg:text-sm text-slate-800 uppercase tracking-widest">Visionary</div>
@@ -472,7 +478,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Professional Identity - Updated for Perfect Alignment */}
+        {/* Professional Identity */}
         <section id="about" className="relative">
           <div className="mb-20 text-center lg:text-left">
             <h2 className="text-5xl md:text-7xl font-serif font-bold mb-4 tracking-tighter text-slate-900">Professional <span className="text-purple-600 italic">Identity</span></h2>
