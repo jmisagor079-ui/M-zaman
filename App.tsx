@@ -494,7 +494,7 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
-              {/* Picture Label - Changed from Verified to Visionary */}
+              {/* Picture Label - Visionary */}
               <div className="absolute bottom-4 lg:bottom-10 -left-2 lg:-left-6 glass p-2 lg:p-6 rounded-xl lg:rounded-3xl shadow-2xl border border-white/60">
                 <div className="flex items-center space-x-2 lg:space-x-4">
                   <div className="bg-green-500 w-2 h-2 lg:w-4 lg:h-4 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.6)] animate-pulse" />
@@ -518,14 +518,11 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {/* Professional Identity - Updated as requested */}
+        {/* Professional Identity - Perfect Text Alignment */}
         <section id="about">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
-            <div>
-              <h2 className="text-4xl md:text-6xl font-serif font-bold mb-4 tracking-tighter">Professional <span className="text-purple-600 italic">Identity</span></h2>
-              <div className="w-32 h-1.5 bg-gradient-to-r from-purple-600 via-pink-400 to-peach-300 rounded-full" />
-            </div>
-            {/* Removed the Official Profile Badge container as requested */}
+          <div className="mb-16">
+            <h2 className="text-4xl md:text-6xl font-serif font-bold mb-4 tracking-tighter">Professional <span className="text-purple-600 italic">Identity</span></h2>
+            <div className="w-32 h-1.5 bg-gradient-to-r from-purple-600 via-pink-400 to-peach-300 rounded-full" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -534,39 +531,63 @@ const App: React.FC = () => {
                  <div className="md:col-span-2 bg-[#1a1c2c] p-12 text-white flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl -mr-16 -mt-16" />
                     <div className="relative z-10">
-                      <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-[28px] flex items-center justify-center mb-10 shadow-2xl"><User size={40} className="text-white" /></div>
+                      <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-[28px] flex items-center justify-center mb-10 shadow-2xl">
+                        <User size={40} className="text-white" />
+                      </div>
                       <h3 className="text-4xl font-serif font-bold mb-3 tracking-tight">Maisha Zaman</h3>
                       <p className="text-purple-300 text-xs font-black uppercase tracking-[0.3em] mb-10 opacity-90">Economics Scholar</p>
+                      
                       <div className="space-y-6">
                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center"><Award size={18} className="text-purple-300" /></div>
-                            <div><p className="text-[9px] font-black uppercase text-slate-500">Merit</p><p className="text-sm font-bold">CGPA {EDUCATION.result}</p></div>
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                              <Award size={18} className="text-purple-300" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Academic Performance</span>
+                              <span className="text-sm font-bold">CGPA {EDUCATION.result}</span>
+                            </div>
                          </div>
                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center"><Zap size={18} className="text-orange-300" /></div>
-                            <div><p className="text-[9px] font-black uppercase text-slate-500">Curriculum</p><p className="text-sm font-bold">{EDUCATION.curriculum}</p></div>
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                              <Zap size={18} className="text-orange-300" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Current Curriculum</span>
+                              <span className="text-sm font-bold">{EDUCATION.curriculum}</span>
+                            </div>
                          </div>
                       </div>
                     </div>
                  </div>
+
                  <div className="md:col-span-3 p-12 bg-white/30 backdrop-blur-xl">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-12">
                        {[
-                         { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
-                         { label: 'Institution', value: 'Govt. Titumir College', icon: <GraduationCap size={20} className="text-indigo-500" /> },
-                         { label: 'Academic Year', value: '2nd Year (Bachelor)', icon: <Calendar size={20} className="text-pink-500" /> },
-                         { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={20} className="text-green-500" /> },
-                         { label: 'Gmail', value: PERSONAL_INFO.email, icon: <Mail size={20} className="text-blue-500" />, span: true },
+                         { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={18} className="text-purple-500" /> },
+                         { label: 'Institution', value: 'Govt. Titumir College', icon: <GraduationCap size={18} className="text-indigo-500" /> },
+                         { label: 'Academic Year', value: '2nd Year (Bachelor)', icon: <Calendar size={18} className="text-pink-500" /> },
+                         { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={18} className="text-green-500" /> },
+                         { label: 'Gmail', value: 'maishazaman1502@gmail.com', icon: <Mail size={18} className="text-blue-500" />, span: true },
                        ].map((item) => (
                          <div key={item.label} className={`relative group ${item.span ? 'sm:col-span-2' : ''}`}>
-                           <div className="flex items-center gap-2 mb-2">{item.icon}<span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{item.label}</span></div>
-                           <p className="text-lg font-bold text-slate-800 group-hover:text-purple-600 transition-colors break-all">{item.value}</p>
+                           <div className="flex items-center gap-2.5 mb-2.5">
+                              <div className="flex items-center justify-center">
+                                {item.icon}
+                              </div>
+                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{item.label}</span>
+                           </div>
+                           <p className="text-lg font-bold text-slate-800 group-hover:text-purple-600 transition-colors break-words leading-tight pl-0.5">
+                             {item.value}
+                           </p>
                          </div>
                        ))}
                     </div>
-                    <div className="mt-16 pt-10 border-t border-slate-100 flex flex-wrap gap-3">
+                    
+                    <div className="mt-16 pt-10 border-t border-slate-200/50 flex flex-wrap gap-3">
                        {['Macroeconomics', 'Civic Analysis', 'Fabric Texture Art', 'Psychology', 'English Medium'].map(skill => (
-                         <span key={skill} className="px-5 py-2 glass bg-white rounded-2xl text-[11px] font-bold text-slate-600 border border-slate-100">{skill}</span>
+                         <span key={skill} className="px-5 py-2 glass bg-white/60 rounded-2xl text-[11px] font-bold text-slate-600 border border-slate-100/50 hover:bg-white hover:border-purple-200 transition-all cursor-default shadow-sm">
+                           {skill}
+                         </span>
                        ))}
                     </div>
                  </div>
@@ -575,7 +596,12 @@ const App: React.FC = () => {
 
             <div className="lg:col-span-4 flex flex-col gap-6">
                <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} className="glass p-10 rounded-[48px] border border-white/60 shadow-xl bg-gradient-to-br from-white to-indigo-50/30 flex-1">
-                  <div className="flex items-center justify-between mb-10"><h4 className="text-2xl font-serif font-bold text-slate-800">Performance</h4><div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600"><Zap size={20} /></div></div>
+                  <div className="flex items-center justify-between mb-10">
+                    <h4 className="text-2xl font-serif font-bold text-slate-800">Performance</h4>
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                      <Zap size={20} />
+                    </div>
+                  </div>
                   <div className="space-y-8">
                     {[
                       { skill: 'Teaching Method', level: '98%', color: 'from-purple-500 to-indigo-500' },
@@ -583,15 +609,27 @@ const App: React.FC = () => {
                       { skill: 'Creative Insight', level: '95%', color: 'from-pink-500 to-orange-500' },
                     ].map(s => (
                       <div key={s.skill}>
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3"><span className="text-slate-400">{s.skill}</span><span className="text-slate-900">{s.level}</span></div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5"><motion.div initial={{ width: 0 }} whileInView={{ width: s.level }} transition={{ duration: 1.5 }} className={`h-full bg-gradient-to-r ${s.color} rounded-full`} /></div>
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
+                          <span className="text-slate-400">{s.skill}</span>
+                          <span className="text-slate-900">{s.level}</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
+                          <motion.div initial={{ width: 0 }} whileInView={{ width: s.level }} transition={{ duration: 1.5 }} className={`h-full bg-gradient-to-r ${s.color} rounded-full`} />
+                        </div>
                       </div>
                     ))}
                   </div>
                </motion.div>
-               <motion.div onClick={() => setShowHireModal(true)} className="p-8 rounded-[40px] bg-slate-900 text-white flex flex-col justify-center items-center text-center group cursor-pointer hover:shadow-2xl transition-all">
-                  <div className="flex items-center gap-3 mb-2"><div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" /><span className="text-xl font-bold">Hire Maisha</span></div>
-                  <p className="text-xs text-slate-400">Available for Home & Private Tuition</p>
+               
+               <motion.div 
+                 onClick={() => setShowHireModal(true)} 
+                 className="p-8 rounded-[40px] bg-slate-900 text-white flex flex-col justify-center items-center text-center group cursor-pointer hover:shadow-2xl transition-all border border-slate-800"
+               >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                    <span className="text-xl font-bold">Hire Maisha</span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium">Available for Home & Private Tuition</p>
                </motion.div>
             </div>
           </div>
