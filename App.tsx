@@ -3,13 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, Palette, GraduationCap, MapPin, Phone, Mail, 
   Facebook, User, Calendar, Briefcase, Clock, DollarSign, 
-  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Verified, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
+  ExternalLink, MessageCircle, Heart, Star, Brush, X, Trash2, LogOut, CheckCircle, ShieldCheck, Award, Zap, Plus, ArrowLeft, Send, Image as ImageIcon, Upload, Sparkles, Loader2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import ThreeBackground from './components/ThreeBackground';
 import GlassCard from './components/GlassCard';
 import { SERVICES, EDUCATION, SOCIALS, LOCATIONS, PERSONAL_INFO } from './constants';
-import { Message, ArtWork, Comment } from './types';
+import { Message, ArtWork } from './types';
+
+// Interface for Professional Identity mapping
+interface IdentityItem {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  span?: boolean;
+}
 
 const App: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -49,7 +57,6 @@ const App: React.FC = () => {
   const artDescRef = useRef<HTMLTextAreaElement>(null);
   const artTitleRef = useRef<HTMLInputElement>(null);
 
-  // Sync state to local storage whenever it changes
   useEffect(() => {
     localStorage.setItem('maisha_messages', JSON.stringify(messages));
   }, [messages]);
@@ -77,7 +84,6 @@ const App: React.FC = () => {
     }
   }, [heroImages]);
 
-  // AI Feature: Generate Art Description using Gemini
   const generateAiDescription = async () => {
     const title = artTitleRef.current?.value;
     if (!title) {
@@ -196,6 +202,15 @@ const App: React.FC = () => {
     });
     e.currentTarget.reset();
   };
+
+  // Defining identity items with improved layout syntax to prevent clipping
+  const identityItems: IdentityItem[] = [
+    { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
+    { label: 'Institution', value: EDUCATION.institute, icon: <GraduationCap size={20} className="text-indigo-500" /> },
+    { label: 'Academic Year', value: EDUCATION.degree, icon: <Calendar size={20} className="text-pink-500" /> },
+    { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={20} className="text-green-500" /> },
+    { label: 'Gmail Address', value: PERSONAL_INFO.email, icon: <Mail size={20} className="text-blue-500" />, span: true },
+  ];
 
   if (isAdmin) {
     return (
@@ -438,7 +453,6 @@ const App: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Hero Image with Added 3D Effect */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }} 
             animate={{ opacity: 1, scale: 1 }} 
@@ -493,7 +507,7 @@ const App: React.FC = () => {
                     <div className="relative z-10 w-full flex flex-col items-center">
                       <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-pink-500 rounded-[32px] flex items-center justify-center mb-8 shadow-2xl border border-white/20"><User size={48} className="text-white" /></div>
                       <h3 className="text-4xl font-serif font-bold mb-2 tracking-tight">Maisha Zaman</h3>
-                      <p className="text-purple-300 text-xs font-black uppercase tracking-[0.3em] mb-12 opacity-90">Economics Scholar</p>
+                      <p className="text-purple-300 text-xs font-black uppercase tracking-[0.3em] mb-12 opacity-90">Visionary Economics Scholar</p>
                       
                       <div className="space-y-8 w-full">
                          <div className="flex flex-col items-center gap-2">
@@ -516,19 +530,13 @@ const App: React.FC = () => {
 
                  <div className="md:col-span-3 p-12 bg-white/40 backdrop-blur-2xl flex flex-col justify-center">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-12 gap-x-10">
-                       {[
-                         { label: 'Primary Region', value: PERSONAL_INFO.location, icon: <MapPin size={20} className="text-purple-500" /> },
-                         { label: 'Institution', value: 'Govt. Titumir College', icon: <GraduationCap size={20} className="text-indigo-500" /> },
-                         { label: 'Academic Year', value: '2nd Year (Bachelor)', icon: <Calendar size={20} className="text-pink-500" /> },
-                         { label: 'Direct Access', value: PERSONAL_INFO.phone, icon: <Phone size={20} className="text-green-500" /> },
-                         { label: 'Gmail Address', value: 'maishazaman1502@gmail.com', icon: <Mail size={20} className="text-blue-500" />, span: true },
-                       ].map((item) => (
+                       {identityItems.map((item) => (
                          <div key={item.label} className={`flex flex-col items-start ${item.span ? 'sm:col-span-2' : ''}`}>
                            <div className="flex items-center gap-3 mb-3">
                               <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">{item.icon}</div>
                               <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{item.label}</span>
                            </div>
-                           <p className="text-lg font-bold text-slate-800 leading-tight break-all">
+                           <p className="text-lg font-bold text-slate-800 leading-tight break-words hyphens-none">
                              {item.value}
                            </p>
                          </div>

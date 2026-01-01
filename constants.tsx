@@ -28,8 +28,8 @@ export const SERVICES: Service[] = [
 ];
 
 export const EDUCATION: EducationItem = {
-  degree: 'Bachelor/Honors (2nd Year)',
-  institute: 'Government Titumir College',
+  degree: '2nd Year (Bachelor)',
+  institute: 'Govt. Titumir College',
   year: '2024',
   result: 'CGPA 3.67',
   group: 'Economics',
