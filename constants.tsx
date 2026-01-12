@@ -37,15 +37,14 @@ export const EDUCATION: EducationItem = {
 
 export const SOCIALS: SocialLink[] = [
   { platform: 'Facebook', url: 'https://www.facebook.com/maisha.zaman.921677', icon: 'Facebook' },
-  { platform: 'Email', url: 'mailto:maishazaman1502@gmail.com', icon: 'Mail' },
-  { platform: 'Phone', url: 'tel:01521426685', icon: 'Phone' }
+  { platform: 'Email', url: 'mailto:maishazaman1502@gmail.com', icon: 'Mail' }
 ];
 
 export const PERSONAL_INFO = {
   tutorId: '358377',
   name: 'Maisha Zaman',
   email: 'maishazaman1502@gmail.com',
-  phone: '01521426685',
+  phone: '',
   city: 'Dhaka',
   location: 'Shewrapara',
   dob: '15 February 2004',
